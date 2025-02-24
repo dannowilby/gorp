@@ -1,27 +1,32 @@
 package gorp
 
-import "fmt"
+type log_entry struct {
+	term    int
+	message string
+}
 
-// Broker type
-const (
-	Candidate = iota
-	Follower
-	Leader
-)
+func follower() {
+	// listen for append message rpcs to this replica
+}
 
 type Broker struct {
-	config string
+	// the set of servers participating in consensus
+	config []string
 
 	// persistent state
-	log         []string
+	log         []log_entry
 	commit_term int
 	voted_for   string
 
 	// volatile state
 	commit_index int
 	last_applied int
+
+	// the functionality to run if leader, candidate, or follower
+	role_func func()
 }
 
-func Hello() {
-	fmt.Println("Hello from broker!")
-}
+// a config change entails the following process
+// 1. augment the current config with the new config
+// 2. commit the augmented config as a log entry
+// 3. now that it is commited, change to the new config
