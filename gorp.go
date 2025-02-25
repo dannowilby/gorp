@@ -9,30 +9,32 @@ import (
 
 func run() error {
 
-	replica := gorp.Broker{
-		State: gorp.State{},
-		Role:  gorp.Candidate{},
-	}
+	// todo:
+	// - catch interrupts
+	// - handle errors from roles
+	// - implement better machine logging
+
+	state := gorp.State{}
+	role := gorp.Candidate{State: &state}
+	replica := gorp.Broker{Role: role}
 
 	for {
-		next_role := replica.Run()
+		next_role := replica.Role.Execute()
 		fmt.Println("Next role:", reflect.TypeOf(next_role))
 
 		switch next_role.(type) {
 		case gorp.Exiting:
-			return nil
+			return next_role.(gorp.Exiting).Error
 		default:
 			replica.Role = next_role
 		}
 	}
-
-	return nil
 }
 
 func main() {
 	if err := run(); err != nil {
 		fmt.Println(err)
 	} else {
-		fmt.Println("Shut down gracefully.")
+		fmt.Println("Shutting down gracefully.")
 	}
 }

@@ -1,25 +1,34 @@
 package gorp
 
-import "fmt"
-
-type log_entry struct {
+type LogEntry struct {
 	term    int
 	message string
 }
 
+type Broker struct {
+	Role Role
+}
+
 type Role interface {
-	// sets up the RPC listener/other functionality
-	// returns the next state of the replica
-	Execute(State) Role
+	// Used to implement the actual logic of the replicas/individual roles
+	Execute() Role
+
+	// Used as a type check to ensure that the role has a relation
+	// to the underlying state object of the replica
+	GetState() *State
 }
 
 type State struct {
+
+	// the running replica's host/port
+	host string
+
 	// the set of servers participating in consensus
 	config []string
 
 	// persistent state
-	log         []log_entry
-	Commit_term int
+	log         []LogEntry
+	commit_term int
 	voted_for   string
 
 	// volatile state
@@ -27,38 +36,17 @@ type State struct {
 	last_applied int
 }
 
-type Broker struct {
-	State State
-	Role  Role
+type Exiting struct {
+	State *State
+	Error error
 }
 
-func (broker Broker) Run() Role {
-	return broker.Role.Execute(broker.State)
-}
-
-type Follower struct{}
-
-func (Follower) Execute(state State) Role {
-	return Follower{}
-}
-
-type Candidate struct{}
-
-func (Candidate) Execute(state State) Role {
-	fmt.Println("Running as candidate replica.")
+func (Exiting) Execute() Role {
 	return Exiting{}
 }
 
-type Leader struct{}
-
-func (Leader) Execute(state State) Role {
-	return Leader{}
-}
-
-type Exiting struct{}
-
-func (Exiting) Execute(state State) Role {
-	return Exiting{}
+func (exiting Exiting) GetState() *State {
+	return exiting.State
 }
 
 // a config change entails the following process
