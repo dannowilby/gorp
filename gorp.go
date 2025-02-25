@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"reflect"
 
-	gorp "github.com/dannowilby/gorp/lib"
+	gorp "github.com/dannowilby/gorp/lib/lib"
 )
 
 func run() error {
@@ -13,7 +13,6 @@ func run() error {
 	// - catch interrupts
 	// - handle errors from roles
 	// - implement better machine logging
-
 	state := gorp.State{}
 	role := gorp.Candidate{State: &state}
 	replica := gorp.Broker{Role: role}
