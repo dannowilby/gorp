@@ -34,6 +34,10 @@ type State struct {
 	// volatile state
 	commit_index int
 	last_applied int
+
+	// timeouts in milliseconds
+	elapsed_timeout  int
+	election_timeout int
 }
 
 type Exiting struct {
