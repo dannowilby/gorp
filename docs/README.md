@@ -5,7 +5,7 @@ A distributed photo app implemented with Raft.
 
 ## Implemented features
 
-- [ ] Message apending
+- [ ] Message appending
 - [ ] Config changes
 - [ ] Leadership consensus
 - [ ] Log replication
