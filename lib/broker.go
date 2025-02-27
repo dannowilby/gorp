@@ -35,9 +35,8 @@ type State struct {
 	commit_index int
 	last_applied int
 
-	// timeouts in milliseconds
-	elapsed_timeout  int
-	election_timeout int
+	// timeout in milliseconds
+	ElectionTimeout int
 }
 
 type Exiting struct {

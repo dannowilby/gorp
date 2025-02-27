@@ -9,14 +9,9 @@ import (
 
 func run() error {
 
-	// todo:
-	// - catch interrupts
-	// - handle errors from roles
-	// - implement better machine logging
-
-	state := gorp.State{}
+	state := gorp.State{ElectionTimeout: 500}
 	role := gorp.Follower{State: &state}
-	replica := gorp.Broker{Role: role}
+	replica := gorp.Broker{Role: &role}
 
 	for {
 		next_role := replica.Role.Execute()

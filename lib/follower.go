@@ -2,10 +2,11 @@ package gorp
 
 import (
 	"context"
+	"fmt"
 	"net"
 	"net/http"
 	"net/rpc"
-	"strconv"
+	"sync"
 	"time"
 )
 
@@ -18,6 +19,8 @@ type Follower struct {
 
 	// add a mutex so the different go routines handling the RPC
 	// endpoints can update the timeout
+	last_request_lock sync.Mutex
+	last_request      time.Time
 }
 
 /* RPC methods */
@@ -27,7 +30,7 @@ type AppendMessage struct {
 	leader_id string
 
 	// -1 indicates that the log is empty
-	prev_log_index int
+	PrevLogIndex int
 
 	prev_log_term int
 	entry         LogEntry
@@ -36,62 +39,84 @@ type AppendMessage struct {
 }
 
 type MessageReply struct {
-	commit_term int
-	success     bool
+	CommitTerm int
+	Success    bool
 }
 
-func (follower Follower) AppendMessage(message AppendMessage, reply *MessageReply) error {
+func (follower *Follower) AppendMessage(message AppendMessage, reply *MessageReply) error {
 
-	// reset timeout
-	follower.State.elapsed_timeout = follower.State.election_timeout
+	follower.last_request_lock.Lock()
+	follower.last_request = time.Now()
+	follower.last_request_lock.Unlock()
 
 	// check that the terms are the same
 	if message.term != follower.State.commit_term {
-		reply.commit_term = follower.State.commit_term
-		reply.success = false
+		reply.CommitTerm = follower.State.commit_term
+		reply.Success = false
 		return nil
 	}
 
 	// check if the log contains the prev_index
-	if message.prev_log_index >= len(follower.State.log) && message.prev_log_index != -1 {
-		reply.commit_term = follower.State.commit_term
-		reply.success = false
+	if message.PrevLogIndex >= len(follower.State.log)-1 && message.PrevLogIndex != -1 {
+		reply.CommitTerm = follower.State.commit_term
+		reply.Success = false
 		return nil // Warning, think about the inductive case! This will cause errors!
 	}
 
 	// now that we know prev_index exists, check that it has the correct term
-	if message.prev_log_term != follower.State.log[message.prev_log_index].term {
-		reply.commit_term = follower.State.commit_term
-		reply.success = false
+	if len(follower.State.log) > 0 && message.prev_log_term != follower.State.log[message.PrevLogIndex].term {
+		reply.CommitTerm = follower.State.commit_term
+		reply.Success = false
 		return nil
 	}
 
 	// the previous message matches, now append the new messages, removing any
 	// existing logs with conflicting index
-	follower.State.log = follower.State.log[0:(message.prev_log_index + 1)]
+	follower.State.log = follower.State.log[0:(message.PrevLogIndex + 1)]
 	follower.State.log = append(follower.State.log, message.entry)
 
 	// set commit index
 	if message.leader_commit > follower.State.commit_index {
-		follower.State.commit_index = min(message.leader_commit)
+		follower.State.commit_index = min(message.leader_commit, len(follower.State.log)-1)
 	}
 
-	reply.commit_term = follower.State.commit_term
-	reply.success = true
+	reply.CommitTerm = follower.State.commit_term
+	reply.Success = true
 	return nil
 }
 
-func monitorHeartbeat(ctx context.Context, follower *Follower) {
-	dur, _ := time.ParseDuration(strconv.Itoa(follower.State.election_timeout) + "ms")
+func monitorHeartbeat(ctx context.Context, cancel context.CancelFunc, follower *Follower) {
+	dur, _ := time.ParseDuration("100ms") // time between ticker updates
 	ticker := time.NewTicker(dur)
 	defer ticker.Stop()
 
-	// check ticker.C for elapsed time
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			follower.last_request_lock.Lock()
+			elapsed := time.Since(follower.last_request)
+			follower.last_request_lock.Unlock()
+
+			if elapsed > time.Duration(follower.State.ElectionTimeout*1000000) {
+				cancel()
+			}
+
+			fmt.Println("Follower idle for", elapsed)
+		}
+	}
 }
 
 /* Role setup/common methods */
 
-func (follower Follower) Execute() Role {
+func (follower *Follower) Execute() Role {
+
+	// the replica has just converted from a candidate to a follower, so this is
+	// because of a request that was sent
+	follower.last_request_lock.Lock()
+	follower.last_request = time.Now()
+	follower.last_request_lock.Unlock()
 
 	// register the RPC
 	rpc.Register(follower)
@@ -106,19 +131,17 @@ func (follower Follower) Execute() Role {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	go monitorHeartbeat(ctx, &follower)
+	go monitorHeartbeat(ctx, cancel, follower)
 
 	go func() {
 		http.Serve(l, nil)
 	}()
 
-	// when we get the done signal,
-	// switch the states
 	<-ctx.Done()
 	l.Close()
 	return Candidate{State: follower.State}
 }
 
-func (follower Follower) GetState() *State {
+func (follower *Follower) GetState() *State {
 	return follower.State
 }
