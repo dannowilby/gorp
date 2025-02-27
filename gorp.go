@@ -1,8 +1,11 @@
 package main
 
 import (
-	"fmt"
+	"flag"
+	"log/slog"
+	"os"
 	"reflect"
+	"strings"
 
 	gorp "github.com/dannowilby/gorp/lib"
 )
@@ -14,22 +17,51 @@ func run() error {
 	replica := gorp.Broker{Role: &role}
 
 	for {
-		next_role := replica.Role.Execute()
-		fmt.Println("Next role:", reflect.TypeOf(next_role))
+		next_role, err := replica.Role.Execute()
 
-		switch next_role.(type) {
-		case gorp.Exiting:
-			return next_role.(gorp.Exiting).Error
-		default:
-			replica.Role = next_role
+		if err != nil {
+			return err
 		}
+
+		slog.Info("Switching role.", "next_role", reflect.TypeOf(next_role))
+		replica.Role = next_role
 	}
 }
 
+func configure_log() {
+	logLevel := flag.String("lvl", "info", "Log level (debug, info, warn, error)")
+	flag.Parse()
+
+	// Set up the logger with the specified level
+	var level slog.Level
+	switch strings.ToLower(*logLevel) {
+	case "debug":
+		level = slog.LevelDebug
+	case "info":
+		level = slog.LevelInfo
+	case "warn":
+		level = slog.LevelWarn
+	case "error":
+		level = slog.LevelError
+	default:
+		level = slog.LevelInfo
+	}
+
+	// Create a logger with the desired level
+	logger := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{
+		Level: level,
+	}))
+
+	// Set the logger as the default
+	slog.SetDefault(logger)
+}
+
 func main() {
+	configure_log()
+
 	if err := run(); err != nil {
-		fmt.Println(err)
+		slog.Error("Error, exiting.", "error", err)
 	} else {
-		fmt.Println("Shutting down gracefully.")
+		slog.Info("Shutting down gracefully.")
 	}
 }

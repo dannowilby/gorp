@@ -11,7 +11,7 @@ type Broker struct {
 
 type Role interface {
 	// Used to implement the actual logic of the replicas/individual roles
-	Execute() Role
+	Execute() (Role, error)
 
 	// Used as a type check to ensure that the role has a relation
 	// to the underlying state object of the replica
@@ -37,19 +37,6 @@ type State struct {
 
 	// timeout in milliseconds
 	ElectionTimeout int
-}
-
-type Exiting struct {
-	State *State
-	Error error
-}
-
-func (Exiting) Execute() Role {
-	return Exiting{}
-}
-
-func (exiting Exiting) GetState() *State {
-	return exiting.State
 }
 
 // a config change entails the following process

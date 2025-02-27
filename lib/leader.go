@@ -1,12 +1,14 @@
 package gorp
 
+import "errors"
+
 type Leader struct {
 	State *State
 }
 
-func (leader Leader) Execute() Role {
+func (leader Leader) Execute() (Role, error) {
 
-	return Leader{}
+	return nil, errors.New("Unimplemented!")
 }
 
 func (leader Leader) GetState() *State {

@@ -2,7 +2,7 @@ package gorp
 
 import (
 	"context"
-	"fmt"
+	"log/slog"
 	"net"
 	"net/http"
 	"net/rpc"
@@ -103,14 +103,14 @@ func monitorHeartbeat(ctx context.Context, cancel context.CancelFunc, follower *
 				cancel()
 			}
 
-			fmt.Println("Follower idle for", elapsed)
+			slog.Debug("Follower clock tick", "elapsed", elapsed)
 		}
 	}
 }
 
 /* Role setup/common methods */
 
-func (follower *Follower) Execute() Role {
+func (follower *Follower) Execute() (Role, error) {
 
 	// the replica has just converted from a candidate to a follower, so this is
 	// because of a request that was sent
@@ -125,7 +125,7 @@ func (follower *Follower) Execute() Role {
 	// set up the listener for incoming RPC requests
 	l, err := net.Listen("tcp", ":1234")
 	if err != nil {
-		return Exiting{State: follower.State, Error: err}
+		return nil, err
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -139,7 +139,7 @@ func (follower *Follower) Execute() Role {
 
 	<-ctx.Done()
 	l.Close()
-	return Candidate{State: follower.State}
+	return Candidate{State: follower.State}, nil
 }
 
 func (follower *Follower) GetState() *State {

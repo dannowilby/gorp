@@ -1,14 +1,15 @@
 package gorp
 
-import "fmt"
+import (
+	"errors"
+)
 
 type Candidate struct {
 	State *State
 }
 
-func (Candidate) Execute() Role {
-	fmt.Println("Running as candidate replica.")
-	return Exiting{}
+func (Candidate) Execute() (Role, error) {
+	return nil, errors.New("Unimplemented!")
 }
 
 func (candidate Candidate) GetState() *State {
