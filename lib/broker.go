@@ -1,8 +1,8 @@
 package gorp
 
 type LogEntry struct {
-	term    int
-	message string
+	Term    int
+	Message string
 }
 
 type Broker struct {

@@ -6,7 +6,7 @@ import (
 	"time"
 )
 
-func TestCanSendAppendMessage(t *testing.T) {
+func TestCanMakeAppendMessageRPC(t *testing.T) {
 	state := State{ElectionTimeout: 500}
 	role := Follower{State: &state}
 	replica := Broker{Role: &role}
@@ -31,4 +31,26 @@ func TestCanSendAppendMessage(t *testing.T) {
 	}
 
 	t.Log(rply.Success, rply.CommitTerm)
+}
+
+func TestCanAppendMessageOnStartup(t *testing.T) {
+	state := State{ElectionTimeout: 500}
+	role := Follower{State: &state}
+
+	msg := AppendMessage{PrevLogIndex: -1, Entry: LogEntry{Term: 0, Message: "simple message"}}
+
+	rply := MessageReply{}
+
+	err := role.AppendMessage(msg, &rply)
+	if err != nil {
+		t.Fatal("Error calling AppendMessage function.", err)
+	}
+
+	if !rply.Success {
+		t.Fatal("Unsuccessful appending message.")
+	}
+
+	if len(state.log) != 1 || state.log[0].Message != "simple message" {
+		t.Fatal("Logs don't match.")
+	}
 }

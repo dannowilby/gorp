@@ -33,7 +33,7 @@ type AppendMessage struct {
 	PrevLogIndex int
 
 	prev_log_term int
-	entry         LogEntry
+	Entry         LogEntry
 
 	leader_commit int
 }
@@ -64,7 +64,7 @@ func (follower *Follower) AppendMessage(message AppendMessage, reply *MessageRep
 	}
 
 	// now that we know prev_index exists, check that it has the correct term
-	if len(follower.State.log) > 0 && message.prev_log_term != follower.State.log[message.PrevLogIndex].term {
+	if len(follower.State.log) > 0 && message.prev_log_term != follower.State.log[message.PrevLogIndex].Term {
 		reply.CommitTerm = follower.State.commit_term
 		reply.Success = false
 		return nil
@@ -73,7 +73,7 @@ func (follower *Follower) AppendMessage(message AppendMessage, reply *MessageRep
 	// the previous message matches, now append the new messages, removing any
 	// existing logs with conflicting index
 	follower.State.log = follower.State.log[0:(message.PrevLogIndex + 1)]
-	follower.State.log = append(follower.State.log, message.entry)
+	follower.State.log = append(follower.State.log, message.Entry)
 
 	// set commit index
 	if message.leader_commit > follower.State.commit_index {
