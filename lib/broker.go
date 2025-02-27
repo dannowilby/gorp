@@ -11,6 +11,7 @@ type Broker struct {
 
 type Role interface {
 	// Used to implement the actual logic of the replicas/individual roles
+	// Returns the next role to transition to
 	Execute() (Role, error)
 
 	// Used as a type check to ensure that the role has a relation
@@ -39,7 +40,8 @@ type State struct {
 	ElectionTimeout int
 }
 
-// a config change entails the following process
-// 1. augment the current config with the new config
-// 2. commit the augmented config as a log entry
-// 3. now that it is commited, change to the new config
+// Potentially common RPCs between role types:
+// - A config change entails the following process
+//   1. augment the current config with the new config
+//   2. commit the augmented config as a log entry
+//   3. now that it is commited, change to the new config

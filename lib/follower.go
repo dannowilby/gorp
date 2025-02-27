@@ -99,6 +99,7 @@ func monitorHeartbeat(ctx context.Context, cancel context.CancelFunc, follower *
 			elapsed := time.Since(follower.last_request)
 			follower.last_request_lock.Unlock()
 
+			// multiple by 1000000 to convert ns to ms
 			if elapsed > time.Duration(follower.State.ElectionTimeout*1000000) {
 				cancel()
 			}
@@ -139,6 +140,7 @@ func (follower *Follower) Execute() (Role, error) {
 
 	<-ctx.Done()
 	l.Close()
+
 	return Candidate{State: follower.State}, nil
 }
 
