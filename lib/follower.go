@@ -49,25 +49,21 @@ func (follower *Follower) AppendMessage(message AppendMessage, reply *MessageRep
 	follower.last_request = time.Now()
 	follower.last_request_lock.Unlock()
 
-	// check that the terms are the same
-	if message.term != follower.State.commit_term {
+	// check that the leader term is acceptable
+	if message.term < follower.State.commit_term {
 		reply.CommitTerm = follower.State.commit_term
 		reply.Success = false
 		return nil
 	}
 
-	// check if the log contains the prev_index
-	if message.PrevLogIndex >= len(follower.State.log)-1 && message.PrevLogIndex != -1 {
-		reply.CommitTerm = follower.State.commit_term
-		reply.Success = false
-		return nil // Warning, think about the inductive case! This will cause errors!
-	}
-
-	// now that we know prev_index exists, check that it has the correct term
-	if len(follower.State.log) > 0 && message.prev_log_term != follower.State.log[message.PrevLogIndex].Term {
-		reply.CommitTerm = follower.State.commit_term
-		reply.Success = false
-		return nil
+	// if the log at the previous index does not contain the same term, then
+	// return false
+	if message.PrevLogIndex != -1 {
+		if len(follower.State.log)-1 < message.PrevLogIndex || follower.State.log[message.prev_log_term].Term != message.prev_log_term {
+			reply.CommitTerm = follower.State.commit_term
+			reply.Success = false
+			return nil
+		}
 	}
 
 	// the previous message matches, now append the new messages, removing any
