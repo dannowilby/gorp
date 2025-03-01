@@ -11,7 +11,7 @@ func TestCanMakeAppendMessageRPC(t *testing.T) {
 	role := Follower{State: &state}
 	replica := Broker{Role: &role}
 
-	go replica.Role.Execute()
+	go replica.Execute()
 
 	// wait for server to start
 	time.Sleep(time.Millisecond * 100)
@@ -23,9 +23,9 @@ func TestCanMakeAppendMessageRPC(t *testing.T) {
 
 	msg := AppendMessage{PrevLogIndex: -1}
 
-	rply := MessageReply{}
+	rply := AppendMessageReply{}
 
-	err = client.Call("Follower.AppendMessage", &msg, &rply)
+	err = client.Call("Broker.AppendMessage", &msg, &rply)
 	if err != nil {
 		t.Fatal("Error calling AppendMessage RPC.", err)
 	}
@@ -39,7 +39,7 @@ func TestCanAppendMessageOnStartup(t *testing.T) {
 
 	msg := AppendMessage{PrevLogIndex: -1, Entry: LogEntry{Term: 0, Message: "simple message"}}
 
-	rply := MessageReply{}
+	rply := AppendMessageReply{}
 
 	err := role.AppendMessage(msg, &rply)
 	if err != nil {
@@ -71,7 +71,7 @@ func TestCanAppendMessageFollowerOneAhead(t *testing.T) {
 
 	msg := AppendMessage{term: 1, PrevLogIndex: 0, prev_log_term: 0, Entry: LogEntry{Term: 1, Message: "simple message"}}
 
-	rply := MessageReply{}
+	rply := AppendMessageReply{}
 
 	err := role.AppendMessage(msg, &rply)
 	if err != nil {
@@ -103,7 +103,7 @@ func TestCanAppendMessageFollowerMultipleAhead(t *testing.T) {
 
 	msg := AppendMessage{term: 4, PrevLogIndex: 10, prev_log_term: 4, Entry: LogEntry{Term: 4, Message: "simple message"}}
 
-	rply := MessageReply{}
+	rply := AppendMessageReply{}
 
 	err := role.AppendMessage(msg, &rply)
 	if err != nil {

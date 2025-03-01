@@ -3,17 +3,10 @@ package gorp
 import (
 	"context"
 	"log/slog"
-	"net"
-	"net/http"
-	"net/rpc"
 	"sync"
 	"time"
 )
 
-// Implements the AppendMessage RPC as defined in the Raft paper. The election
-// timeout is kept track of by a separate go function which ticks down, checking
-// the time of the last request. If the timeout has expired, then the replica is
-// converted to a candidate.
 type Follower struct {
 	State *State
 
@@ -23,27 +16,7 @@ type Follower struct {
 	last_request      time.Time
 }
 
-/* RPC methods */
-
-type AppendMessage struct {
-	term      int
-	leader_id string
-
-	// -1 indicates that the log is empty
-	PrevLogIndex int
-
-	prev_log_term int
-	Entry         LogEntry
-
-	leader_commit int
-}
-
-type MessageReply struct {
-	CommitTerm int
-	Success    bool
-}
-
-func (follower *Follower) AppendMessage(message AppendMessage, reply *MessageReply) error {
+func (follower *Follower) AppendMessage(message AppendMessage, reply *AppendMessageReply) error {
 
 	follower.last_request_lock.Lock()
 	follower.last_request = time.Now()
@@ -81,9 +54,42 @@ func (follower *Follower) AppendMessage(message AppendMessage, reply *MessageRep
 	return nil
 }
 
-// func (follower *Follower) RequestVote() {
+func (follower *Follower) RequestVote(msg RequestVoteMessage, rply *RequestVoteReply) error {
 
-// }
+	// msg not new enough
+	if msg.term < follower.State.commit_term {
+		rply.term = follower.State.commit_term
+		rply.vote_granted = false
+		return nil
+	}
+
+	// check that this machine has not voted for a different one this term
+	if follower.State.voted_for != "" && follower.State.voted_for != msg.candidate_id {
+		rply.term = follower.State.commit_term
+		rply.vote_granted = false
+		return nil
+	}
+
+	log := follower.State.log
+
+	// check if its up-to-date
+	if len(log) > 0 && msg.last_log_index < follower.State.last_applied || msg.last_log_term < log[len(log)-1].Term {
+		rply.term = follower.State.commit_term
+		rply.vote_granted = false
+		return nil
+	}
+
+	// grant the vote
+	rply.term = follower.State.commit_term
+	rply.vote_granted = true
+
+	// since successful, update the election timeout
+	follower.last_request_lock.Lock()
+	follower.last_request = time.Now()
+	follower.last_request_lock.Unlock()
+
+	return nil
+}
 
 func monitorHeartbeat(ctx context.Context, cancel context.CancelFunc, follower *Follower) {
 	dur, _ := time.ParseDuration("100ms") // time between ticker updates
@@ -109,8 +115,6 @@ func monitorHeartbeat(ctx context.Context, cancel context.CancelFunc, follower *
 	}
 }
 
-/* Role setup/common methods */
-
 func (follower *Follower) Execute() (Role, error) {
 
 	// the replica has just converted from a candidate to a follower, so this is
@@ -119,27 +123,12 @@ func (follower *Follower) Execute() (Role, error) {
 	follower.last_request = time.Now()
 	follower.last_request_lock.Unlock()
 
-	// register the RPC
-	rpc.Register(follower)
-	rpc.HandleHTTP()
-
-	// set up the listener for incoming RPC requests
-	l, err := net.Listen("tcp", ":1234")
-	if err != nil {
-		return nil, err
-	}
-
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
 	go monitorHeartbeat(ctx, cancel, follower)
 
-	go func() {
-		http.Serve(l, nil)
-	}()
-
 	<-ctx.Done()
-	l.Close()
 
 	candidate := new(Candidate)
 	candidate.State = follower.State

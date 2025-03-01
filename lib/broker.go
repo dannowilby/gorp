@@ -1,5 +1,11 @@
 package gorp
 
+import (
+	"net"
+	"net/http"
+	"net/rpc"
+)
+
 type LogEntry struct {
 	Term    int
 	Message string
@@ -9,8 +15,42 @@ type Broker struct {
 	Role Role
 }
 
-// This will potentially have to be refactored.
+type RequestVoteMessage struct {
+	term         int
+	candidate_id string
+
+	last_log_index int
+	last_log_term  int
+}
+
+type RequestVoteReply struct {
+	term int
+
+	vote_granted bool
+}
+
+type AppendMessage struct {
+	term      int
+	leader_id string
+
+	// -1 indicates that the log is empty
+	PrevLogIndex int
+
+	prev_log_term int
+	Entry         LogEntry
+
+	leader_commit int
+}
+
+type AppendMessageReply struct {
+	CommitTerm int
+	Success    bool
+}
+
 type Role interface {
+	RequestVote(RequestVoteMessage, *RequestVoteReply) error
+
+	AppendMessage(AppendMessage, *AppendMessageReply) error
 
 	// Used to implement the actual logic of the replicas/individual roles
 	// Returns the next role to transition to
@@ -40,6 +80,29 @@ type State struct {
 
 	// timeout in milliseconds
 	ElectionTimeout int
+}
+
+func (broker *Broker) RequestVote(msg RequestVoteMessage, rply *RequestVoteReply) error {
+	return broker.Role.RequestVote(msg, rply)
+}
+
+func (broker *Broker) AppendMessage(am AppendMessage, mr *AppendMessageReply) error {
+	return broker.Role.AppendMessage(am, mr)
+}
+
+func (broker *Broker) Execute() {
+	rpc.Register(broker)
+	rpc.HandleHTTP()
+
+	l, err := net.Listen("tcp", ":1234")
+	if err != nil {
+		return
+	}
+
+	broker.Role.Execute()
+
+	http.Serve(l, nil)
+
 }
 
 // Potentially common RPCs between role types:
