@@ -9,7 +9,9 @@ type Broker struct {
 	Role Role
 }
 
+// This will potentially have to be refactored.
 type Role interface {
+
 	// Used to implement the actual logic of the replicas/individual roles
 	// Returns the next role to transition to
 	Execute() (Role, error)

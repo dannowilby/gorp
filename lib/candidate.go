@@ -8,8 +8,19 @@ type Candidate struct {
 	State *State
 }
 
-func (Candidate) Execute() (Role, error) {
-	return nil, errors.New("Unimplemented!")
+func (candidate *Candidate) Execute() (Role, error) {
+
+	// Transitioning to this state, we immediately update the term
+	candidate.State.commit_term += 1
+
+	// call RequestVote to all other machines, voting for itself
+
+	// if a majority accept, then transition to a leader and sends heartbeats to
+	// enforce its authority
+
+	// if a majority does not occur, then time out, start a new term trying again
+
+	return nil, errors.New("Not fully implemented!")
 }
 
 func (candidate Candidate) GetState() *State {

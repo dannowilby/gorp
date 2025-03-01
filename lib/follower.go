@@ -81,6 +81,10 @@ func (follower *Follower) AppendMessage(message AppendMessage, reply *MessageRep
 	return nil
 }
 
+// func (follower *Follower) RequestVote() {
+
+// }
+
 func monitorHeartbeat(ctx context.Context, cancel context.CancelFunc, follower *Follower) {
 	dur, _ := time.ParseDuration("100ms") // time between ticker updates
 	ticker := time.NewTicker(dur)
@@ -137,7 +141,10 @@ func (follower *Follower) Execute() (Role, error) {
 	<-ctx.Done()
 	l.Close()
 
-	return Candidate{State: follower.State}, nil
+	candidate := new(Candidate)
+	candidate.State = follower.State
+
+	return candidate, nil
 }
 
 func (follower *Follower) GetState() *State {
