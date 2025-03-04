@@ -2,16 +2,20 @@ package gorp
 
 import (
 	"errors"
+	"fmt"
+	"net/rpc"
 )
 
 type Candidate struct {
 	State *State
 }
 
+// If this machine has already requested votes, then do nothing
 func (candidate *Candidate) RequestVote(msg RequestVoteMessage, rply *RequestVoteReply) error {
 	return nil
 }
 
+// Turn to follower if term is equal to or less than the message term
 func (candidate *Candidate) AppendMessage(msg AppendMessage, rply *AppendMessageReply) error {
 	return nil
 }
@@ -22,6 +26,32 @@ func (candidate *Candidate) Execute() (Role, error) {
 	candidate.State.commit_term += 1
 
 	// call RequestVote to all other machines, voting for itself
+
+	for _, element := range candidate.State.config {
+
+		if element == candidate.State.host {
+			continue
+		}
+
+		// need to make async
+		go func() {
+
+			client, err := rpc.DialHTTP("tcp", element+":1234")
+			if err != nil {
+				return
+			}
+
+			args := RequestVoteMessage{}
+			rply := RequestVoteReply{}
+
+			err = client.Call("Broker.RequestVote", args, &rply)
+			if err != nil {
+				return
+			}
+
+			fmt.Println(element)
+		}()
+	}
 
 	// if a majority accept, then transition to a leader and sends heartbeats to
 	// enforce its authority

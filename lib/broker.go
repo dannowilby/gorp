@@ -1,11 +1,5 @@
 package gorp
 
-import (
-	"net"
-	"net/http"
-	"net/rpc"
-)
-
 type LogEntry struct {
 	Term    int
 	Message string
@@ -90,19 +84,8 @@ func (broker *Broker) AppendMessage(am AppendMessage, mr *AppendMessageReply) er
 	return broker.Role.AppendMessage(am, mr)
 }
 
-func (broker *Broker) Execute() {
-	rpc.Register(broker)
-	rpc.HandleHTTP()
-
-	l, err := net.Listen("tcp", ":1234")
-	if err != nil {
-		return
-	}
-
-	broker.Role.Execute()
-
-	http.Serve(l, nil)
-
+func (broker *Broker) Execute() (Role, error) {
+	return broker.Role.Execute()
 }
 
 // Potentially common RPCs between role types:

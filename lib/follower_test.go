@@ -1,37 +1,8 @@
 package gorp
 
 import (
-	"net/rpc"
 	"testing"
-	"time"
 )
-
-func TestCanMakeAppendMessageRPC(t *testing.T) {
-	state := State{ElectionTimeout: 500}
-	role := Follower{State: &state}
-	replica := Broker{Role: &role}
-
-	go replica.Execute()
-
-	// wait for server to start
-	time.Sleep(time.Millisecond * 100)
-
-	client, err := rpc.DialHTTP("tcp", "localhost"+":1234")
-	if err != nil {
-		t.Fatal("Unable to connect to broker.", err)
-	}
-
-	msg := AppendMessage{PrevLogIndex: -1}
-
-	rply := AppendMessageReply{}
-
-	err = client.Call("Broker.AppendMessage", &msg, &rply)
-	if err != nil {
-		t.Fatal("Error calling AppendMessage RPC.", err)
-	}
-
-	t.Log(rply.Success, rply.CommitTerm)
-}
 
 func TestCanAppendMessageOnStartup(t *testing.T) {
 	state := State{ElectionTimeout: 500}

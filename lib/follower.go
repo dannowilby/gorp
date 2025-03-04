@@ -44,6 +44,10 @@ func (follower *Follower) AppendMessage(message AppendMessage, reply *AppendMess
 	follower.State.log = follower.State.log[0:(message.PrevLogIndex + 1)]
 	follower.State.log = append(follower.State.log, message.Entry)
 
+	// TODO:
+	// Update this machine's leader id
+	// as AppendMessage establishes dominance
+
 	// set commit index
 	if message.leader_commit > follower.State.commit_index {
 		follower.State.commit_index = min(message.leader_commit, len(follower.State.log)-1)
