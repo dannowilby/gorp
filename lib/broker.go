@@ -1,5 +1,7 @@
 package gorp
 
+import "sync"
+
 type LogEntry struct {
 	Term    int
 	Message string
@@ -7,6 +9,8 @@ type LogEntry struct {
 
 type Broker struct {
 	Role Role
+
+	ChangeLock sync.Mutex
 }
 
 type RequestVoteMessage struct {
@@ -76,11 +80,30 @@ type State struct {
 	ElectionTimeout int
 }
 
+func (broker *Broker) ChangeRole(role Role) {
+	// lock so that other goroutines/the RPCs cannot run
+	broker.ChangeLock.Lock()
+	broker.Role = role
+	broker.ChangeLock.Unlock()
+}
+
 func (broker *Broker) RequestVote(msg RequestVoteMessage, rply *RequestVoteReply) error {
+
+	// Make sure we're not changing, might want to check that this doesn't get
+	// reduced reduced to a noop
+	broker.ChangeLock.Lock()
+	broker.ChangeLock.Unlock()
+
 	return broker.Role.RequestVote(msg, rply)
 }
 
 func (broker *Broker) AppendMessage(am AppendMessage, mr *AppendMessageReply) error {
+
+	// Make sure we're not changing, might want to check that this doesn't get
+	// reduced reduced to a noop
+	broker.ChangeLock.Lock()
+	broker.ChangeLock.Unlock()
+
 	return broker.Role.AppendMessage(am, mr)
 }
 

@@ -23,7 +23,7 @@ func run() error {
 	// the calls themselves don't change, but the
 	// underlying calls do
 
-	rpc.Register(replica)
+	rpc.Register(&replica)
 	rpc.HandleHTTP()
 	l, err := net.Listen("tcp", ":1234")
 	if err != nil {
@@ -44,7 +44,7 @@ func run() error {
 		}
 
 		slog.Info("Switching role.", "next_role", reflect.TypeOf(next_role))
-		replica.Role = next_role
+		replica.ChangeRole(next_role)
 	}
 }
 
