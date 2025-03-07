@@ -14,6 +14,9 @@ type Follower struct {
 	// endpoints can update the timeout
 	last_request_lock sync.Mutex
 	last_request      time.Time
+
+	RPCSignal       chan Role
+	ExecutionSignal chan Role
 }
 
 func (follower *Follower) AppendMessage(message AppendMessage, reply *AppendMessageReply) error {
@@ -119,7 +122,16 @@ func monitorHeartbeat(ctx context.Context, cancel context.CancelFunc, follower *
 	}
 }
 
-func (follower *Follower) Execute() (Role, error) {
+func (follower *Follower) NextRole() (Role, error) {
+	select {
+	case next_role := <-follower.RPCSignal:
+		return next_role, nil
+	case next_role := <-follower.ExecutionSignal:
+		return next_role, nil
+	}
+}
+
+func (follower *Follower) Execute() {
 
 	// the replica has just converted from a candidate to a follower, so this is
 	// because of a request that was sent
@@ -130,14 +142,12 @@ func (follower *Follower) Execute() (Role, error) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
+	// TODO:
+	// move the monitor heartbeat up a level, ie. check for the parent
+	// context as well as the timer context
 	go monitorHeartbeat(ctx, cancel, follower)
 
 	<-ctx.Done()
-
-	candidate := new(Candidate)
-	candidate.State = follower.State
-
-	return candidate, nil
 }
 
 func (follower *Follower) GetState() *State {

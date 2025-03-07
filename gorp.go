@@ -1,13 +1,10 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"log/slog"
-	"net"
-	"net/http"
-	"net/rpc"
 	"os"
-	"reflect"
 	"strings"
 
 	gorp "github.com/dannowilby/gorp/lib"
@@ -19,32 +16,30 @@ func run() error {
 	role := gorp.Follower{State: &state}
 	replica := gorp.Broker{Role: &role}
 
-	// start serving the broker's RPC calls
-	// the calls themselves don't change, but the
-	// underlying calls do
-
-	rpc.Register(&replica)
-	rpc.HandleHTTP()
-	l, err := net.Listen("tcp", ":1234")
-	if err != nil {
-		return err
-	}
-	go http.Serve(l, nil)
-
-	// Without locks, this is a recipe for disaster. If our server is sent a
-	// message while the role is being changed, I would imagine that this causes
-	// some sort of undefined behavior that we need to protect against.
-
 	for {
-		next_role, err := replica.Execute()
 
+		ctx, cancel := context.WithCancel(context.Background())
+
+		// start executing replica housekeeping
+		go replica.Execute(ctx)
+
+		// start replica RPC server
+		go replica.Serve(ctx)
+
+		// wait for a change of state
+		next_role, err := replica.Role.NextRole()
+
+		// shutdown server and execution thread
+		cancel()
+
+		// if it is changing to shutdown or an error happened,
+		// just return the err msg
 		if err != nil {
-			l.Close()
 			return err
 		}
 
-		slog.Info("Switching role.", "next_role", reflect.TypeOf(next_role))
-		replica.ChangeRole(next_role)
+		// switch finally
+		replica.Role = next_role
 	}
 }
 

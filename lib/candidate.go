@@ -2,8 +2,6 @@ package gorp
 
 import (
 	"errors"
-	"fmt"
-	"net/rpc"
 )
 
 type Candidate struct {
@@ -33,24 +31,7 @@ func (candidate *Candidate) Execute() (Role, error) {
 			continue
 		}
 
-		// need to make async
-		go func() {
-
-			client, err := rpc.DialHTTP("tcp", element+":1234")
-			if err != nil {
-				return
-			}
-
-			args := RequestVoteMessage{}
-			rply := RequestVoteReply{}
-
-			err = client.Call("Broker.RequestVote", args, &rply)
-			if err != nil {
-				return
-			}
-
-			fmt.Println(element)
-		}()
+		// request vote from each machine in config
 	}
 
 	// if a majority accept, then transition to a leader and sends heartbeats to
