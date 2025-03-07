@@ -8,19 +8,19 @@ type LogEntry struct {
 type State struct {
 
 	// the running replica's host/port
-	host string
+	Host string
 
 	// the set of servers participating in consensus
-	config []string
+	Config []string
 
 	// persistent state
-	log         []LogEntry
-	commit_term int
-	voted_for   string
+	Log        []LogEntry
+	CommitTerm int
+	VotedFor   string
 
 	// volatile state
-	commit_index int
-	last_applied int
+	CommitIndex int
+	LastApplied int
 
 	// timeout in milliseconds
 	ElectionTimeout int

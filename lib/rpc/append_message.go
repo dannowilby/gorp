@@ -1,16 +1,18 @@
-package gorp
+package gorp_rpc
+
+import gorp "github.com/dannowilby/gorp/lib"
 
 type AppendMessage struct {
-	term      int
-	leader_id string
+	Term     int
+	LeaderId string
 
 	// -1 indicates that the log is empty
 	PrevLogIndex int
 
-	prev_log_term int
-	Entry         LogEntry
+	PrevLogTerm int
+	Entry       gorp.LogEntry
 
-	leader_commit int
+	LeaderCommit int
 }
 
 type AppendMessageReply struct {

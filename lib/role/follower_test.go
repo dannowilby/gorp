@@ -1,16 +1,19 @@
-package gorp
+package gorp_role
 
 import (
 	"testing"
+
+	gorp "github.com/dannowilby/gorp/lib"
+	gorp_rpc "github.com/dannowilby/gorp/lib/rpc"
 )
 
 func TestCanAppendMessageOnStartup(t *testing.T) {
-	state := State{ElectionTimeout: 500}
+	state := gorp.State{ElectionTimeout: 500}
 	role := Follower{State: &state}
 
-	msg := AppendMessage{PrevLogIndex: -1, Entry: LogEntry{Term: 0, Message: "simple message"}}
+	msg := gorp_rpc.AppendMessage{PrevLogIndex: -1, Entry: gorp.LogEntry{Term: 0, Message: "simple message"}}
 
-	rply := AppendMessageReply{}
+	rply := gorp_rpc.AppendMessageReply{}
 
 	err := role.AppendMessage(msg, &rply)
 	if err != nil {
@@ -21,7 +24,7 @@ func TestCanAppendMessageOnStartup(t *testing.T) {
 		t.Fatal("Unsuccessful appending message.")
 	}
 
-	if len(state.log) != 1 || state.log[0].Message != "simple message" {
+	if len(state.Log) != 1 || state.Log[0].Message != "simple message" {
 		t.Fatal("Logs don't match.")
 	}
 }
@@ -31,18 +34,18 @@ func TestCanAppendMessageOnStartup(t *testing.T) {
 // the proper one
 func TestCanAppendMessageFollowerOneAhead(t *testing.T) {
 
-	logs := make([]LogEntry, 0)
-	logs = append(logs, LogEntry{Term: 0, Message: "Existing 1."})
-	logs = append(logs, LogEntry{Term: 0, Message: "Existing 2."})
+	logs := make([]gorp.LogEntry, 0)
+	logs = append(logs, gorp.LogEntry{Term: 0, Message: "Existing 1."})
+	logs = append(logs, gorp.LogEntry{Term: 0, Message: "Existing 2."})
 
-	state := State{log: logs, commit_index: 1, last_applied: 1}
+	state := gorp.State{Log: logs, CommitIndex: 1, LastApplied: 1}
 	role := Follower{State: &state}
 
-	state.commit_term = 1
+	state.CommitTerm = 1
 
-	msg := AppendMessage{term: 1, PrevLogIndex: 0, prev_log_term: 0, Entry: LogEntry{Term: 1, Message: "simple message"}}
+	msg := gorp_rpc.AppendMessage{Term: 1, PrevLogIndex: 0, PrevLogTerm: 0, Entry: gorp.LogEntry{Term: 1, Message: "simple message"}}
 
-	rply := AppendMessageReply{}
+	rply := gorp_rpc.AppendMessageReply{}
 
 	err := role.AppendMessage(msg, &rply)
 	if err != nil {
@@ -53,7 +56,7 @@ func TestCanAppendMessageFollowerOneAhead(t *testing.T) {
 		t.Fatal("AppendMessage failed.")
 	}
 
-	if state.log[0].Message != "Existing 1." || state.log[1].Message != "simple message" {
+	if state.Log[0].Message != "Existing 1." || state.Log[1].Message != "simple message" {
 		t.Fatal("Logs don't match.")
 	}
 }
@@ -63,18 +66,18 @@ func TestCanAppendMessageFollowerOneAhead(t *testing.T) {
 // decrement its prev_log counter for the replica and try calling AppendMessage again
 func TestCanAppendMessageFollowerMultipleAhead(t *testing.T) {
 
-	logs := make([]LogEntry, 0)
-	logs = append(logs, LogEntry{Term: 0, Message: "Existing 1."})
-	logs = append(logs, LogEntry{Term: 0, Message: "Existing 2."})
+	logs := make([]gorp.LogEntry, 0)
+	logs = append(logs, gorp.LogEntry{Term: 0, Message: "Existing 1."})
+	logs = append(logs, gorp.LogEntry{Term: 0, Message: "Existing 2."})
 
-	state := State{log: logs, commit_index: 1, last_applied: 1}
+	state := gorp.State{Log: logs, CommitIndex: 1, LastApplied: 1}
 	role := Follower{State: &state}
 
-	state.commit_term = 1
+	state.CommitTerm = 1
 
-	msg := AppendMessage{term: 4, PrevLogIndex: 10, prev_log_term: 4, Entry: LogEntry{Term: 4, Message: "simple message"}}
+	msg := gorp_rpc.AppendMessage{Term: 4, PrevLogIndex: 10, PrevLogTerm: 4, Entry: gorp.LogEntry{Term: 4, Message: "simple message"}}
 
-	rply := AppendMessageReply{}
+	rply := gorp_rpc.AppendMessageReply{}
 
 	err := role.AppendMessage(msg, &rply)
 	if err != nil {
@@ -85,7 +88,7 @@ func TestCanAppendMessageFollowerMultipleAhead(t *testing.T) {
 		t.Fatal("AppendMessage should not have succeeded.")
 	}
 
-	if state.log[0].Message != "Existing 1." || state.log[1].Message != "Existing 2." {
+	if state.Log[0].Message != "Existing 1." || state.Log[1].Message != "Existing 2." {
 		t.Fatal("Logs don't match.")
 	}
 }
