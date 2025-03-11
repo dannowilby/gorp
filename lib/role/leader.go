@@ -11,6 +11,12 @@ type Leader struct {
 	State *gorp.State
 }
 
+func (leader *Leader) Init(state *gorp.State) Broker {
+	leader.State = state
+
+	return leader
+}
+
 func (leader *Leader) RequestVote(msg gorp_rpc.RequestVoteMessage, rply *gorp_rpc.RequestVoteReply) error {
 	return nil
 }
@@ -25,6 +31,10 @@ func (leader *Leader) Execute(ctx context.Context) {
 
 func (leader *Leader) Serve(ctx context.Context) {
 
+}
+
+func (leader *Leader) NextRole() (Broker, error) {
+	return nil, nil
 }
 
 func (leader *Leader) GetState() *gorp.State {
