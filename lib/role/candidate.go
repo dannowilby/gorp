@@ -2,6 +2,7 @@ package gorp_role
 
 import (
 	"context"
+	"fmt"
 	"math/rand"
 	"net/rpc"
 	"strconv"
@@ -108,6 +109,7 @@ func (candidate *Candidate) Execute(ctx context.Context) {
 			continue
 		}
 
+		fmt.Println("Do we send a request to", element)
 		// request vote from each machine in config
 		go candidate.SendRequest(timeout_ctx, votes, element)
 
@@ -137,6 +139,8 @@ func (candidate *Candidate) Execute(ctx context.Context) {
 
 	// for some reason, we decided that either we have enough, or we've timed out
 	cancel()
+
+	fmt.Println(vote_tally, votes_needed)
 
 	// if a majority accept, then transition to a leader and sends heartbeats to
 	// enforce its authority
