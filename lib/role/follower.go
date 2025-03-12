@@ -2,7 +2,11 @@ package gorp_role
 
 import (
 	"context"
+	"log"
 	"log/slog"
+	"net"
+	"net/http"
+	"net/rpc"
 	"sync"
 	"time"
 
@@ -160,6 +164,17 @@ func (follower *Follower) Execute(ctx context.Context) {
 
 func (follower *Follower) Serve(ctx context.Context) {
 
+	rpc.Register(follower)
+	rpc.HandleHTTP()
+	l, err := net.Listen("tcp", ":1234")
+	if err != nil {
+		log.Fatal("listen error:", err)
+	}
+	go http.Serve(l, nil)
+
+	// we are changing state or something has happened where we need to exit
+	<-ctx.Done()
+	l.Close()
 }
 
 func (follower *Follower) GetState() *gorp.State {
