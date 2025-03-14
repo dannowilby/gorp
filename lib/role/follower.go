@@ -3,7 +3,6 @@ package gorp_role
 import (
 	"context"
 	"errors"
-	"fmt"
 	"log/slog"
 	"sync"
 	"time"
@@ -79,7 +78,7 @@ func (follower *Follower) AppendMessage(message gorp_rpc.AppendMessage, reply *g
 
 func (follower *Follower) RequestVote(msg gorp_rpc.RequestVoteMessage, rply *gorp_rpc.RequestVoteReply) error {
 
-	fmt.Println("Request received on follower!")
+	slog.Debug("Request received on follower!")
 
 	// msg not new enough
 	if msg.Term < follower.State.CommitTerm {
@@ -107,6 +106,8 @@ func (follower *Follower) RequestVote(msg gorp_rpc.RequestVoteMessage, rply *gor
 	// grant the vote
 	rply.Term = follower.State.CommitTerm
 	rply.VoteGranted = true
+
+	// We need to update the votedFor member here
 
 	// since successful, update the election timeout
 	follower.last_request_lock.Lock()

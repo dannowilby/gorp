@@ -35,7 +35,7 @@ func (candidate *Candidate) Init(state *gorp.State) Role {
 // If this machine has already requested votes, then do nothing
 func (candidate *Candidate) RequestVote(msg gorp_rpc.RequestVoteMessage, rply *gorp_rpc.RequestVoteReply) error {
 
-	fmt.Println("Request received on candidate!")
+	slog.Debug("Request received on candidate!")
 
 	// if we are actively trying to get votes, don't allow it to vote for others
 	if !candidate.Requesting.TryLock() {
@@ -78,8 +78,13 @@ func (candidate *Candidate) RequestVote(msg gorp_rpc.RequestVoteMessage, rply *g
 	return nil
 }
 
+// Another machine has turned into a leader. It has done so with a majority of
+// votes, so now this machine should also accept the leader.
 // Turn to follower if term is equal to or less than the message term
 func (candidate *Candidate) AppendMessage(msg gorp_rpc.AppendMessage, rply *gorp_rpc.AppendMessageReply) error {
+
+	candidate.ChangeSignal <- new(Follower).Init(candidate.State)
+
 	return nil
 }
 

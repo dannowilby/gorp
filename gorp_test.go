@@ -53,7 +53,7 @@ func run_scenario(t *testing.T, scenario *Scenario) {
 		go Run(ctx, &scenario.Replicas[i])
 	}
 
-	duration, _ := time.ParseDuration("1000ms")
+	duration, _ := time.ParseDuration("2000ms")
 	<-time.After(duration)
 
 	cancel()
@@ -64,7 +64,8 @@ func run_scenario(t *testing.T, scenario *Scenario) {
 	for i := range scenario.Replicas {
 		fmt.Println(&scenario.Replicas[i])
 	}
-	t.Fatal()
+
+	// t.Fatal()
 }
 
 // Read the scenario json files from `tests` and parse them

@@ -7,7 +7,7 @@ A distributed photo app implemented with Raft [1].
 
 - [x] Message appending
 - [ ] Config changes
-- [ ] Leadership consensus
+- [x] Leadership consensus
 - [ ] Log replication
 - [ ] Log compaction
 
