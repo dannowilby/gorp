@@ -2,9 +2,12 @@ package gorp_role
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"math/rand"
 	"net/rpc"
 	"strconv"
+	"strings"
 	"time"
 
 	gorp "github.com/dannowilby/gorp/lib"
@@ -37,9 +40,11 @@ func (candidate *Candidate) AppendMessage(msg gorp_rpc.AppendMessage, rply *gorp
 	return nil
 }
 
-func (candidate *Candidate) NextRole() (Broker, error) {
+func (candidate *Candidate) NextRole(ctx context.Context) (Broker, error) {
 
 	select {
+	case <-ctx.Done():
+		return nil, errors.New("cancelled")
 	case next_role := <-candidate.VoteTimeoutSignal:
 		return next_role, nil
 	case next_role := <-candidate.RPCSignal:
@@ -49,7 +54,9 @@ func (candidate *Candidate) NextRole() (Broker, error) {
 
 func (candidate Candidate) SendRequest(ctx context.Context, vote_status chan bool, element string) {
 
-	client, err := rpc.DialHTTP("tcp", element)
+	port := strings.Split(element, ":")[1]
+
+	client, err := rpc.DialHTTPPath("tcp", element, "/"+port)
 
 	if err != nil {
 		vote_status <- false
@@ -79,6 +86,8 @@ func (candidate Candidate) SendRequest(ctx context.Context, vote_status chan boo
 }
 
 func (candidate *Candidate) Execute(ctx context.Context) {
+
+	fmt.Println("We are a candidate!")
 
 	// Transitioning to this state, we immediately update the term
 	candidate.State.CommitTerm += 1
@@ -141,6 +150,7 @@ func (candidate *Candidate) Execute(ctx context.Context) {
 	// if a majority accept, then transition to a leader and sends heartbeats to
 	// enforce its authority
 	if vote_tally >= votes_needed {
+		fmt.Println("NEW LEADER!")
 		candidate.VoteTimeoutSignal <- new(Leader).Init(candidate.State)
 		return
 	}

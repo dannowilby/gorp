@@ -2,11 +2,12 @@ package gorp_role
 
 import (
 	"context"
-	"log"
+	"errors"
+	"fmt"
 	"log/slog"
-	"net"
 	"net/http"
 	"net/rpc"
+	"strings"
 	"sync"
 	"time"
 
@@ -117,8 +118,10 @@ func (follower *Follower) RequestVote(msg gorp_rpc.RequestVoteMessage, rply *gor
 	return nil
 }
 
-func (follower *Follower) NextRole() (Broker, error) {
+func (follower *Follower) NextRole(ctx context.Context) (Broker, error) {
 	select {
+	case <-ctx.Done():
+		return nil, errors.New("cancelled")
 	case next_role := <-follower.RPCSignal:
 		return next_role, nil
 	case next_role := <-follower.ExecutionSignal:
@@ -164,17 +167,18 @@ func (follower *Follower) Execute(ctx context.Context) {
 
 func (follower *Follower) Serve(ctx context.Context) {
 
-	rpc.Register(follower)
-	rpc.HandleHTTP()
-	l, err := net.Listen("tcp", ":1234")
-	if err != nil {
-		log.Fatal("listen error:", err)
-	}
-	go http.Serve(l, nil)
+	port := ":" + strings.Split(follower.State.Host, ":")[1]
+
+	fmt.Println(port)
+
+	server := &rpc.Server{}
+	server.Register(follower)
+	server.HandleHTTP("/"+port, "/d"+port)
+
+	go http.ListenAndServe(port, server)
 
 	// we are changing state or something has happened where we need to exit
 	<-ctx.Done()
-	l.Close()
 }
 
 func (follower *Follower) GetState() *gorp.State {

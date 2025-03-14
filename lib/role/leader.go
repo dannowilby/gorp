@@ -2,6 +2,7 @@ package gorp_role
 
 import (
 	"context"
+	"errors"
 
 	gorp "github.com/dannowilby/gorp/lib"
 	gorp_rpc "github.com/dannowilby/gorp/lib/rpc"
@@ -33,8 +34,11 @@ func (leader *Leader) Serve(ctx context.Context) {
 
 }
 
-func (leader *Leader) NextRole() (Broker, error) {
-	return nil, nil
+func (leader *Leader) NextRole(ctx context.Context) (Broker, error) {
+
+	<-ctx.Done()
+
+	return nil, errors.New("cancelled")
 }
 
 func (leader *Leader) GetState() *gorp.State {

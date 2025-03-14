@@ -11,14 +11,13 @@ import (
 	gorp_role "github.com/dannowilby/gorp/lib/role"
 )
 
-func run() error {
+func Run(ctx context.Context, state *gorp.State) error {
 
-	state := gorp.State{ElectionTimeout: 500}
-	var replica gorp_role.Broker = new(gorp_role.Follower).Init(&state)
+	var replica gorp_role.Broker = gorp_role.FromState(state)
 
 	for {
 
-		ctx, cancel := context.WithCancel(context.Background())
+		ctx, cancel := context.WithCancel(ctx)
 
 		// start executing replica housekeeping
 		go replica.Execute(ctx)
@@ -27,7 +26,7 @@ func run() error {
 		go replica.Serve(ctx)
 
 		// wait for a change of state
-		next_role, err := replica.NextRole()
+		next_role, err := replica.NextRole(ctx)
 
 		// shutdown server and execution thread
 		cancel()
@@ -74,7 +73,9 @@ func configure_log() {
 func main() {
 	configure_log()
 
-	if err := run(); err != nil {
+	state := gorp.State{ElectionTimeout: 500}
+
+	if err := Run(context.Background(), &state); err != nil {
 		slog.Error("error, exiting", "error", err)
 	} else {
 		slog.Info("Shutting down gracefully.")
