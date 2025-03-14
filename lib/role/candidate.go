@@ -6,10 +6,8 @@ import (
 	"fmt"
 	"log/slog"
 	"math/rand"
-	"net/http"
 	"net/rpc"
 	"strconv"
-	"strings"
 	"sync"
 	"time"
 
@@ -22,14 +20,14 @@ type Candidate struct {
 
 	Requesting sync.Mutex
 
-	ChangeSignal chan Broker
+	ChangeSignal chan Role
 }
 
-func (candidate *Candidate) Init(state *gorp.State) Broker {
+func (candidate *Candidate) Init(state *gorp.State) Role {
 
 	candidate.State = state
 	candidate.State.Role = "candidate"
-	candidate.ChangeSignal = make(chan Broker, 1)
+	candidate.ChangeSignal = make(chan Role, 1)
 
 	return candidate
 }
@@ -85,7 +83,7 @@ func (candidate *Candidate) AppendMessage(msg gorp_rpc.AppendMessage, rply *gorp
 	return nil
 }
 
-func (candidate *Candidate) NextRole(ctx context.Context) (Broker, error) {
+func (candidate *Candidate) NextRole(ctx context.Context) (Role, error) {
 
 	select {
 	case <-ctx.Done():
@@ -181,7 +179,10 @@ func (candidate *Candidate) Execute(ctx context.Context) {
 			}
 
 			// if we have enough votes, break and become leader
-			completed = vote_tally >= votes_needed
+			// TODO: exit early if winning is impossible
+			won_vote := vote_tally >= votes_needed
+
+			completed = won_vote
 		}
 	}
 
@@ -201,27 +202,6 @@ func (candidate *Candidate) Execute(ctx context.Context) {
 	// if a majority does not occur, then time out, start a new term trying again
 	<-time.After(timeout_duration)
 	candidate.ChangeSignal <- new(Candidate).Init(candidate.State)
-}
-
-func (candidate *Candidate) Serve(ctx context.Context) {
-
-	port := ":" + strings.Split(candidate.State.Host, ":")[1]
-
-	server := rpc.NewServer()
-	server.Register(candidate)
-	server.HandleHTTP("/"+port, "/d"+port)
-
-	httpServer := &http.Server{
-		Addr:    candidate.State.Host,
-		Handler: server,
-	}
-
-	go httpServer.ListenAndServe()
-
-	// we are changing state or something has happened where we need to exit
-	<-ctx.Done()
-
-	httpServer.Shutdown(context.Background())
 }
 
 func (candidate *Candidate) GetState() *gorp.State {

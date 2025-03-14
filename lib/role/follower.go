@@ -5,9 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
-	"net/http"
-	"net/rpc"
-	"strings"
 	"sync"
 	"time"
 
@@ -23,17 +20,17 @@ type Follower struct {
 	last_request_lock sync.Mutex
 	last_request      time.Time
 
-	ChangeSignal chan Broker
+	ChangeSignal chan Role
 }
 
-func (follower *Follower) Init(state *gorp.State) Broker {
+func (follower *Follower) Init(state *gorp.State) Role {
 
 	follower.State = state
 	follower.State.Role = "follower"
 
 	// it's crucial that these channels are buffered so we don't wait for a
 	// receiver to be ready, causing a deadlock
-	follower.ChangeSignal = make(chan Broker, 1)
+	follower.ChangeSignal = make(chan Role, 1)
 
 	return follower
 }
@@ -119,7 +116,7 @@ func (follower *Follower) RequestVote(msg gorp_rpc.RequestVoteMessage, rply *gor
 	return nil
 }
 
-func (follower *Follower) NextRole(ctx context.Context) (Broker, error) {
+func (follower *Follower) NextRole(ctx context.Context) (Role, error) {
 	select {
 	case <-ctx.Done():
 		return nil, errors.New("cancelled")
@@ -162,20 +159,6 @@ func (follower *Follower) Execute(ctx context.Context) {
 		}
 	}
 
-}
-
-func (follower *Follower) Serve(ctx context.Context) {
-
-	port := ":" + strings.Split(follower.State.Host, ":")[1]
-
-	server := &rpc.Server{}
-	server.Register(follower)
-	server.HandleHTTP("/"+port, "/d"+port)
-
-	go http.ListenAndServe(port, server)
-
-	// we are changing state or something has happened where we need to exit
-	<-ctx.Done()
 }
 
 func (follower *Follower) GetState() *gorp.State {

@@ -12,7 +12,7 @@ type Leader struct {
 	State *gorp.State
 }
 
-func (leader *Leader) Init(state *gorp.State) Broker {
+func (leader *Leader) Init(state *gorp.State) Role {
 	leader.State = state
 	leader.State.Role = "leader"
 
@@ -31,11 +31,7 @@ func (leader *Leader) Execute(ctx context.Context) {
 
 }
 
-func (leader *Leader) Serve(ctx context.Context) {
-
-}
-
-func (leader *Leader) NextRole(ctx context.Context) (Broker, error) {
+func (leader *Leader) NextRole(ctx context.Context) (Role, error) {
 
 	<-ctx.Done()
 
