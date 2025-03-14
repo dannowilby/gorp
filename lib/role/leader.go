@@ -14,6 +14,7 @@ type Leader struct {
 
 func (leader *Leader) Init(state *gorp.State) Broker {
 	leader.State = state
+	leader.State.Role = "leader"
 
 	return leader
 }

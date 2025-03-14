@@ -5,9 +5,11 @@ import (
 	"errors"
 	"fmt"
 	"math/rand"
+	"net/http"
 	"net/rpc"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	gorp "github.com/dannowilby/gorp/lib"
@@ -17,21 +19,61 @@ import (
 type Candidate struct {
 	State *gorp.State
 
-	VoteTimeoutSignal chan Broker
-	RPCSignal         chan Broker
+	Requesting sync.Mutex
+
+	ChangeSignal chan Broker
 }
 
 func (candidate *Candidate) Init(state *gorp.State) Broker {
 
 	candidate.State = state
-	candidate.VoteTimeoutSignal = make(chan Broker, 1)
-	candidate.RPCSignal = make(chan Broker, 1)
+	candidate.State.Role = "candidate"
+	candidate.ChangeSignal = make(chan Broker, 1)
 
 	return candidate
 }
 
 // If this machine has already requested votes, then do nothing
 func (candidate *Candidate) RequestVote(msg gorp_rpc.RequestVoteMessage, rply *gorp_rpc.RequestVoteReply) error {
+
+	// if we are actively trying to get votes, don't allow it to vote for others
+	if !candidate.Requesting.TryLock() {
+		// grant the vote
+		rply.Term = candidate.State.CommitTerm
+		rply.VoteGranted = false
+
+		return nil
+	}
+	// we are able to vote, so unlock
+	candidate.Requesting.Unlock()
+
+	// msg not new enough
+	if msg.Term < candidate.State.CommitTerm {
+		rply.Term = candidate.State.CommitTerm
+		rply.VoteGranted = false
+		return nil
+	}
+
+	// check that this machine has not voted for a different one this term
+	if candidate.State.VotedFor != "" && candidate.State.VotedFor != msg.CandidateId {
+		rply.Term = candidate.State.CommitTerm
+		rply.VoteGranted = false
+		return nil
+	}
+
+	log := candidate.State.Log
+
+	// check if its up-to-date
+	if len(log) > 0 && msg.LastLogIndex < candidate.State.LastApplied || msg.LastLogTerm < log[len(log)-1].Term {
+		rply.Term = candidate.State.CommitTerm
+		rply.VoteGranted = false
+		return nil
+	}
+
+	// grant the vote
+	rply.Term = candidate.State.CommitTerm
+	rply.VoteGranted = true
+
 	return nil
 }
 
@@ -45,20 +87,19 @@ func (candidate *Candidate) NextRole(ctx context.Context) (Broker, error) {
 	select {
 	case <-ctx.Done():
 		return nil, errors.New("cancelled")
-	case next_role := <-candidate.VoteTimeoutSignal:
-		return next_role, nil
-	case next_role := <-candidate.RPCSignal:
+	case next_role := <-candidate.ChangeSignal:
 		return next_role, nil
 	}
 }
 
-func (candidate Candidate) SendRequest(ctx context.Context, vote_status chan bool, element string) {
+func (candidate *Candidate) SendRequest(ctx context.Context, vote_status chan bool, element string) {
 
 	port := strings.Split(element, ":")[1]
 
 	client, err := rpc.DialHTTPPath("tcp", element, "/"+port)
 
 	if err != nil {
+		fmt.Println(err)
 		vote_status <- false
 		return
 	}
@@ -72,14 +113,13 @@ func (candidate Candidate) SendRequest(ctx context.Context, vote_status chan boo
 	}
 	request_vote_rply := gorp_rpc.RequestVoteReply{}
 
-	call := make(chan *rpc.Call, 1)
-
-	client.Go("Broker.RequestVote", request_vote_args, &request_vote_rply, call)
+	call := client.Go("Broker.RequestVote", request_vote_args, &request_vote_rply, nil)
 
 	select {
 	case <-ctx.Done():
 		vote_status <- false
-	case <-call:
+	case c := <-call.Done:
+		fmt.Println(c)
 		vote_status <- request_vote_rply.VoteGranted
 	}
 
@@ -87,7 +127,7 @@ func (candidate Candidate) SendRequest(ctx context.Context, vote_status chan boo
 
 func (candidate *Candidate) Execute(ctx context.Context) {
 
-	fmt.Println("We are a candidate!")
+	candidate.Requesting.Lock()
 
 	// Transitioning to this state, we immediately update the term
 	candidate.State.CommitTerm += 1
@@ -109,6 +149,7 @@ func (candidate *Candidate) Execute(ctx context.Context) {
 	total_votes := len(candidate.State.Config) - 1
 	votes_needed := (total_votes / 2) + 1
 	vote_tally := 0
+	votes_received := 0
 
 	// call RequestVote to all other machines
 	for _, element := range candidate.State.Config {
@@ -134,6 +175,7 @@ func (candidate *Candidate) Execute(ctx context.Context) {
 			completed = true
 
 		case vote := <-votes:
+			votes_received += 1
 			// add the vote to the tally
 			if vote {
 				vote_tally += 1
@@ -144,24 +186,44 @@ func (candidate *Candidate) Execute(ctx context.Context) {
 		}
 	}
 
+	fmt.Println(vote_tally, votes_received)
+
 	// for some reason, we decided that either we have enough, or we've timed out
 	cancel()
+	candidate.Requesting.Unlock()
 
 	// if a majority accept, then transition to a leader and sends heartbeats to
 	// enforce its authority
 	if vote_tally >= votes_needed {
 		fmt.Println("NEW LEADER!")
-		candidate.VoteTimeoutSignal <- new(Leader).Init(candidate.State)
+		candidate.ChangeSignal <- new(Leader).Init(candidate.State)
 		return
 	}
 
 	// if a majority does not occur, then time out, start a new term trying again
 	<-time.After(timeout_duration)
-	candidate.VoteTimeoutSignal <- new(Candidate).Init(candidate.State)
+	candidate.ChangeSignal <- new(Candidate).Init(candidate.State)
 }
 
 func (candidate *Candidate) Serve(ctx context.Context) {
 
+	port := ":" + strings.Split(candidate.State.Host, ":")[1]
+
+	server := rpc.NewServer()
+	server.Register(candidate)
+	server.HandleHTTP("/"+port, "/d"+port)
+
+	httpServer := &http.Server{
+		Addr:    candidate.State.Host,
+		Handler: server,
+	}
+
+	go httpServer.ListenAndServe()
+
+	// we are changing state or something has happened where we need to exit
+	<-ctx.Done()
+
+	httpServer.Shutdown(context.Background())
 }
 
 func (candidate *Candidate) GetState() *gorp.State {

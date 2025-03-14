@@ -26,23 +26,23 @@ func TestScenarios(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	fmt.Println(scenarios[0])
-
 	for _, scenario := range scenarios {
 		// run the scenario
-		run_scenario(t, scenario)
+		run_scenario(t, &scenario)
 
-		// compare the states after completion
 	}
 
 }
 
-func run_scenario(t *testing.T, scenario Scenario) {
+func run_scenario(t *testing.T, scenario *Scenario) {
 
 	ctx, cancel := context.WithCancel(context.Background())
 
-	for _, state := range scenario.Replicas {
-		go Run(ctx, &state)
+	for i := range scenario.Replicas {
+
+		fmt.Println(&scenario.Replicas[i])
+
+		go Run(ctx, &scenario.Replicas[i])
 	}
 
 	duration, _ := time.ParseDuration("1000ms")
@@ -50,10 +50,12 @@ func run_scenario(t *testing.T, scenario Scenario) {
 
 	cancel()
 
-	for _, state := range scenario.Replicas {
-		fmt.Println(state)
-	}
+	duration, _ = time.ParseDuration("20ms")
+	<-time.After(duration)
 
+	for i := range scenario.Replicas {
+		fmt.Println(&scenario.Replicas[i])
+	}
 	t.Fatal()
 }
 

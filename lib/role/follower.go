@@ -3,7 +3,6 @@ package gorp_role
 import (
 	"context"
 	"errors"
-	"fmt"
 	"log/slog"
 	"net/http"
 	"net/rpc"
@@ -23,18 +22,17 @@ type Follower struct {
 	last_request_lock sync.Mutex
 	last_request      time.Time
 
-	RPCSignal       chan Broker
-	ExecutionSignal chan Broker
+	ChangeSignal chan Broker
 }
 
 func (follower *Follower) Init(state *gorp.State) Broker {
 
 	follower.State = state
+	follower.State.Role = "follower"
 
 	// it's crucial that these channels are buffered so we don't wait for a
 	// receiver to be ready, causing a deadlock
-	follower.ExecutionSignal = make(chan Broker, 1)
-	follower.RPCSignal = make(chan Broker, 1)
+	follower.ChangeSignal = make(chan Broker, 1)
 
 	return follower
 }
@@ -122,9 +120,7 @@ func (follower *Follower) NextRole(ctx context.Context) (Broker, error) {
 	select {
 	case <-ctx.Done():
 		return nil, errors.New("cancelled")
-	case next_role := <-follower.RPCSignal:
-		return next_role, nil
-	case next_role := <-follower.ExecutionSignal:
+	case next_role := <-follower.ChangeSignal:
 		return next_role, nil
 	}
 }
@@ -156,7 +152,7 @@ func (follower *Follower) Execute(ctx context.Context) {
 			// multiple by 1000000 to convert ns to ms
 			if elapsed > time.Duration(follower.State.ElectionTimeout*1000000) {
 				// if heartbeat fails, send new state to change to a new candidate
-				follower.ExecutionSignal <- new(Candidate).Init(follower.State)
+				follower.ChangeSignal <- new(Candidate).Init(follower.State)
 			}
 
 			slog.Debug("Follower clock tick", "elapsed", elapsed)
@@ -168,8 +164,6 @@ func (follower *Follower) Execute(ctx context.Context) {
 func (follower *Follower) Serve(ctx context.Context) {
 
 	port := ":" + strings.Split(follower.State.Host, ":")[1]
-
-	fmt.Println(port)
 
 	server := &rpc.Server{}
 	server.Register(follower)
