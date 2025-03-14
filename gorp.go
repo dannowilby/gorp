@@ -4,8 +4,12 @@ import (
 	"context"
 	"flag"
 	"log/slog"
+	"net/http"
+	"net/rpc"
 	"os"
 	"strings"
+
+	"github.com/gorilla/mux"
 
 	gorp "github.com/dannowilby/gorp/lib"
 	gorp_role "github.com/dannowilby/gorp/lib/role"
@@ -19,16 +23,31 @@ func Run(ctx context.Context, state *gorp.State) error {
 
 		ctx, cancel := context.WithCancel(ctx)
 
+		// create the server
+
+		router := mux.NewRouter()
+
+		server := rpc.NewServer()
+		server.Register(replica)
+
+		router.Handle("/", server)
+
+		httpServer := &http.Server{
+			Addr:    replica.GetState().Host,
+			Handler: router,
+		}
+
+		// start the RPC server
+		go httpServer.ListenAndServe()
+
 		// start executing replica housekeeping
 		go replica.Execute(ctx)
-
-		// start replica RPC server
-		go replica.Serve(ctx)
 
 		// wait for a change of state
 		next_role, err := replica.NextRole(ctx)
 
 		// shutdown server and execution thread
+		httpServer.Shutdown(ctx)
 		cancel()
 
 		// if it is changing to shutdown or an error happened,

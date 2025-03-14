@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"math/rand"
 	"net/http"
 	"net/rpc"
@@ -36,6 +37,8 @@ func (candidate *Candidate) Init(state *gorp.State) Broker {
 // If this machine has already requested votes, then do nothing
 func (candidate *Candidate) RequestVote(msg gorp_rpc.RequestVoteMessage, rply *gorp_rpc.RequestVoteReply) error {
 
+	fmt.Println("Request received on candidate!")
+
 	// if we are actively trying to get votes, don't allow it to vote for others
 	if !candidate.Requesting.TryLock() {
 		// grant the vote
@@ -64,7 +67,7 @@ func (candidate *Candidate) RequestVote(msg gorp_rpc.RequestVoteMessage, rply *g
 	log := candidate.State.Log
 
 	// check if its up-to-date
-	if len(log) > 0 && msg.LastLogIndex < candidate.State.LastApplied || msg.LastLogTerm < log[len(log)-1].Term {
+	if len(log) > 0 && (msg.LastLogIndex < candidate.State.LastApplied || msg.LastLogTerm < log[len(log)-1].Term) {
 		rply.Term = candidate.State.CommitTerm
 		rply.VoteGranted = false
 		return nil
@@ -94,9 +97,7 @@ func (candidate *Candidate) NextRole(ctx context.Context) (Broker, error) {
 
 func (candidate *Candidate) SendRequest(ctx context.Context, vote_status chan bool, element string) {
 
-	port := strings.Split(element, ":")[1]
-
-	client, err := rpc.DialHTTPPath("tcp", element, "/"+port)
+	client, err := rpc.DialHTTPPath("tcp", element, "/")
 
 	if err != nil {
 		fmt.Println(err)
@@ -112,14 +113,12 @@ func (candidate *Candidate) SendRequest(ctx context.Context, vote_status chan bo
 		LastLogTerm:  candidate.State.CommitTerm,
 	}
 	request_vote_rply := gorp_rpc.RequestVoteReply{}
-
 	call := client.Go("Broker.RequestVote", request_vote_args, &request_vote_rply, nil)
 
 	select {
 	case <-ctx.Done():
 		vote_status <- false
-	case c := <-call.Done:
-		fmt.Println(c)
+	case <-call.Done:
 		vote_status <- request_vote_rply.VoteGranted
 	}
 
@@ -166,7 +165,7 @@ func (candidate *Candidate) Execute(ctx context.Context) {
 	// wait for votes to come in
 	// we could use a loop label, but I don't like those
 	completed := false
-	for completed {
+	for !completed {
 		select {
 		case <-time.After(election_timeout_duration):
 			// if we've timed out, break out of the requests
@@ -186,7 +185,7 @@ func (candidate *Candidate) Execute(ctx context.Context) {
 		}
 	}
 
-	fmt.Println(vote_tally, votes_received)
+	slog.Debug("vote counts", "votes tally", vote_tally, "votes received", votes_received, "votes needed", votes_needed)
 
 	// for some reason, we decided that either we have enough, or we've timed out
 	cancel()
@@ -195,7 +194,6 @@ func (candidate *Candidate) Execute(ctx context.Context) {
 	// if a majority accept, then transition to a leader and sends heartbeats to
 	// enforce its authority
 	if vote_tally >= votes_needed {
-		fmt.Println("NEW LEADER!")
 		candidate.ChangeSignal <- new(Leader).Init(candidate.State)
 		return
 	}

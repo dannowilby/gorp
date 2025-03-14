@@ -3,6 +3,7 @@ package gorp_role
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"net/rpc"
@@ -81,6 +82,8 @@ func (follower *Follower) AppendMessage(message gorp_rpc.AppendMessage, reply *g
 
 func (follower *Follower) RequestVote(msg gorp_rpc.RequestVoteMessage, rply *gorp_rpc.RequestVoteReply) error {
 
+	fmt.Println("Request received on follower!")
+
 	// msg not new enough
 	if msg.Term < follower.State.CommitTerm {
 		rply.Term = follower.State.CommitTerm
@@ -98,7 +101,7 @@ func (follower *Follower) RequestVote(msg gorp_rpc.RequestVoteMessage, rply *gor
 	log := follower.State.Log
 
 	// check if its up-to-date
-	if len(log) > 0 && msg.LastLogIndex < follower.State.LastApplied || msg.LastLogTerm < log[len(log)-1].Term {
+	if len(log) > 0 && (msg.LastLogIndex < follower.State.LastApplied || msg.LastLogTerm < log[len(log)-1].Term) {
 		rply.Term = follower.State.CommitTerm
 		rply.VoteGranted = false
 		return nil

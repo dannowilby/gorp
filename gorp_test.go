@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"os"
 	"testing"
 	"time"
@@ -20,6 +21,13 @@ type Scenario struct {
 // in the normal Golang style as these tests need to be executed sequentially
 // due to the need for them to create multiple HTTP listeners on the same ports.
 func TestScenarios(t *testing.T) {
+
+	logger := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{
+		Level: slog.LevelDebug,
+	}))
+
+	// Set the logger as the default
+	slog.SetDefault(logger)
 
 	scenarios, err := load_scenarios()
 	if err != nil {
