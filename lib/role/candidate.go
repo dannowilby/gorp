@@ -145,7 +145,7 @@ func (candidate *Candidate) Execute(ctx context.Context) {
 		candidate.State.RandomizedTimeout[0]+rand.Intn(candidate.State.RandomizedTimeout[1]-candidate.State.RandomizedTimeout[0])) + "ms")
 	if t1_err != nil || t2_err != nil {
 		// have yet to implement proper error handling
-		panic("please implement proper error handling please")
+		panic("please implement proper error handling please, config is probably bad")
 	}
 
 	timeout_ctx, cancel := context.WithCancel(ctx)
