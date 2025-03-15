@@ -27,4 +27,8 @@ type State struct {
 
 	// timeout in milliseconds
 	ElectionTimeout int `json:"electionTimeout"`
+	// Index 0 is the minimum timeout, and index 1 is the maximum, used in
+	// candidate replicas to calculate how long they should time out for after
+	// losing an election
+	RandomizedTimeout []int `json:"randomizedTimeout"`
 }

@@ -28,6 +28,7 @@ func (candidate *Candidate) Init(state *gorp.State) Role {
 	candidate.State = state
 	candidate.State.Role = "candidate"
 	candidate.ChangeSignal = make(chan Role, 1)
+	candidate.State.VotedFor = ""
 
 	return candidate
 }
@@ -39,7 +40,7 @@ func (candidate *Candidate) RequestVote(msg gorp_rpc.RequestVoteMessage, rply *g
 
 	// if we are actively trying to get votes, don't allow it to vote for others
 	if !candidate.Requesting.TryLock() {
-		// grant the vote
+
 		rply.Term = candidate.State.CommitTerm
 		rply.VoteGranted = false
 
@@ -70,6 +71,10 @@ func (candidate *Candidate) RequestVote(msg gorp_rpc.RequestVoteMessage, rply *g
 		rply.VoteGranted = false
 		return nil
 	}
+
+	// We have timed out and lost the election, now we should only vote for one
+	// other machine
+	candidate.State.VotedFor = msg.CandidateId
 
 	// grant the vote
 	rply.Term = candidate.State.CommitTerm
@@ -136,7 +141,8 @@ func (candidate *Candidate) Execute(ctx context.Context) {
 
 	// create timeouts, election timeout is standard, timeout after the election is random
 	election_timeout_duration, t1_err := time.ParseDuration(strconv.Itoa(candidate.State.ElectionTimeout) + "ms")
-	timeout_duration, t2_err := time.ParseDuration(strconv.Itoa(rand.Intn(candidate.State.ElectionTimeout)) + "ms")
+	timeout_duration, t2_err := time.ParseDuration(strconv.Itoa(
+		candidate.State.RandomizedTimeout[0]+rand.Intn(candidate.State.RandomizedTimeout[1]-candidate.State.RandomizedTimeout[0])) + "ms")
 	if t1_err != nil || t2_err != nil {
 		// have yet to implement proper error handling
 		panic("please implement proper error handling please")
@@ -148,9 +154,9 @@ func (candidate *Candidate) Execute(ctx context.Context) {
 	// vote counting mechanism
 	votes := make(chan bool)
 
-	total_votes := len(candidate.State.Config) - 1
+	total_votes := len(candidate.State.Config)
 	votes_needed := (total_votes / 2) + 1
-	vote_tally := 0
+	vote_tally := 1
 	votes_received := 0
 
 	// call RequestVote to all other machines
@@ -170,6 +176,10 @@ func (candidate *Candidate) Execute(ctx context.Context) {
 	completed := false
 	for !completed {
 		select {
+		case <-ctx.Done():
+			// cancelled for some reason
+			cancel()
+			return
 		case <-time.After(election_timeout_duration):
 			// if we've timed out, break out of the requests
 			// start a new timeout, and then return a new candidate if no new

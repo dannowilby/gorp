@@ -26,6 +26,7 @@ func (follower *Follower) Init(state *gorp.State) Role {
 
 	follower.State = state
 	follower.State.Role = "follower"
+	follower.State.VotedFor = ""
 
 	// it's crucial that these channels are buffered so we don't wait for a
 	// receiver to be ready, causing a deadlock
@@ -108,6 +109,7 @@ func (follower *Follower) RequestVote(msg gorp_rpc.RequestVoteMessage, rply *gor
 	rply.VoteGranted = true
 
 	// We need to update the votedFor member here
+	follower.State.VotedFor = msg.CandidateId
 
 	// since successful, update the election timeout
 	follower.last_request_lock.Lock()
