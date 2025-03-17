@@ -80,6 +80,7 @@ func (broker *Broker) SwitchRole(role Role) {
 	broker.Role = role
 }
 
+// For start up
 func FromState(state *gorp.State) Broker {
 
 	var role Role
