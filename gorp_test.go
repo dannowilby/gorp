@@ -65,7 +65,6 @@ func run_scenario(t *testing.T, scenario *Scenario) {
 		fmt.Println(&scenario.Replicas[i])
 	}
 
-	t.Fatal()
 }
 
 // Read the scenario json files from `tests` and parse them

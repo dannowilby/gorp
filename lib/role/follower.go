@@ -63,17 +63,20 @@ func (follower *Follower) AppendMessage(message gorp_rpc.AppendMessage, reply *g
 	follower.State.Log = follower.State.Log[0:(message.PrevLogIndex + 1)]
 	follower.State.Log = append(follower.State.Log, message.Entry)
 
-	// TODO:
-	// Update this machine's leader id
-	// as AppendMessage establishes dominance
-
 	// set commit index
 	if message.LeaderCommit > follower.State.CommitIndex {
+		// we update our commit index
 		follower.State.CommitIndex = min(message.LeaderCommit, len(follower.State.Log)-1)
 	}
 
 	reply.CommitTerm = follower.State.CommitTerm
 	reply.Success = true
+
+	// apply log to state machine, right now, this isn't implemented yet. This
+	// might also require reversing applied messages if this replica had become
+	// out of sync with the leader
+	follower.State.LastApplied = follower.State.CommitIndex
+
 	return nil
 }
 
