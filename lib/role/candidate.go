@@ -86,7 +86,31 @@ func (candidate *Candidate) RequestVote(msg gorp_rpc.RequestVoteMessage, rply *g
 // Another machine has turned into a leader. It has done so with a majority of
 // votes, so now this machine should also accept the leader.
 // Turn to follower if term is equal to or less than the message term
-func (candidate *Candidate) AppendMessage(msg gorp_rpc.AppendMessage, rply *gorp_rpc.AppendMessageReply) error {
+func (candidate *Candidate) AppendMessage(message gorp_rpc.AppendMessage, reply *gorp_rpc.AppendMessageReply) error {
+
+	// check that the leader term is acceptable
+	if message.Term < candidate.State.CommitTerm {
+		reply.CommitTerm = candidate.State.CommitTerm
+		reply.Success = false
+		return nil
+	}
+
+	// if the log at the previous index does not contain the same term, then
+	// return false
+	if message.PrevLogIndex != -1 {
+		if len(candidate.State.Log)-1 < message.PrevLogIndex || candidate.State.Log[message.PrevLogTerm].Term != message.PrevLogTerm {
+			reply.CommitTerm = candidate.State.CommitTerm
+			reply.Success = false
+			return nil
+		}
+	}
+
+	// unlike the follower, we don't modify anything else
+	// this allows all the behavior that handles log synchronization by the
+	// follower role
+
+	reply.CommitTerm = candidate.State.CommitTerm
+	reply.Success = true
 
 	candidate.ChangeSignal <- new(Follower).Init(candidate.State)
 

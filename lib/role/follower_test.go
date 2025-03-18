@@ -164,6 +164,6 @@ func TestVotingVerifiesLogs(t *testing.T) {
 	role.RequestVote(rqvtmsg, &rqvtrply)
 
 	if rqvtrply.VoteGranted {
-		t.Fatal("Vote not granted")
+		t.Fatal("Vote granted")
 	}
 }
