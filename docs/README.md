@@ -1,5 +1,6 @@
 
 # gorp
+[![Go](https://github.com/dannowilby/gorp/actions/workflows/go.yml/badge.svg)](https://github.com/dannowilby/gorp/actions/workflows/go.yml)
 
 A distributed photo storage implemented with Raft [1].
 
