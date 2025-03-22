@@ -29,6 +29,12 @@ type Role interface {
 	GetState() *gorp.State
 }
 
+// Get the number of machines needed for a majority, does remove the calling
+// machine from the majority. AKA the number of separate machines needed for a majority.
+func NumMajority(role Role) int {
+	return ((len(role.GetState().Config) + 1) / 2) - 1
+}
+
 // A wrapper for the state/role so that RPC calls don't have to be specific
 // about the concrete type it is making the call to. All its methods forward to
 // the Role struct it has an instance of.

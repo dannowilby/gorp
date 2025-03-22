@@ -29,6 +29,9 @@ func (leader *Leader) Init(state *gorp.State) Role {
 	leader.State.Role = "leader"
 	leader.msgs = make(chan gorp.LogEntry, 10)
 
+	leader.nextIndex = make(map[string]int)
+	leader.matchIndex = make(map[string]int)
+
 	for _, server := range state.Config {
 		leader.nextIndex[server] = len(leader.State.Log) - 1
 		leader.matchIndex[server] = 0
@@ -83,37 +86,134 @@ func (leader *Leader) SendHeartbeats(ctx context.Context) {
 
 }
 
-func (leader *Leader) replicate(msg gorp.LogEntry) {
+// Updates the machine and tries to append
+func (leader *Leader) append_to_machine(ctx context.Context, success chan bool, host string, msg gorp.LogEntry) {
 
-	replicated := false
+	client, err := rpc.DialHTTPPath("tcp", host, "/")
 
-	// add the msg to the leaders log
-
-	for !replicated {
-
-		for _, element := range leader.State.Config {
-
-			// we don't need to send the msg to ourself
-			if element == leader.State.Host {
-				continue
-			}
-
-			// if the follower has all the logs, we don't need to send anything
-			if len(leader.State.Log) == leader.matchIndex[element] {
-				continue
-			}
-
-			// now we do need to send something
-
-			// send the log located in nextIndex
-
-			// if it comes back as a failure, decrement and try again
-
-		}
-
+	if err != nil {
+		fmt.Println(err)
+		return
 	}
 
-	// apply to this state machine
+	// send/update machine
+	// only send success when passed in log msg is replicated
+
+	// we try updating automatically, and then after we know its up-to-date,
+	// send the log
+
+	last_log := leader.State.CommitIndex
+	msg_to_send := leader.nextIndex[host]
+
+	up_to_date := false
+	for up_to_date {
+
+		prev_term := -1
+		if msg_to_send != 0 {
+			prev_term = leader.State.Log[msg_to_send-1].Term
+		}
+
+		append_message_args := gorp_rpc.AppendMessage{
+			Term:     leader.State.CommitTerm,
+			LeaderId: leader.State.Host,
+
+			PrevLogTerm:  prev_term,
+			PrevLogIndex: msg_to_send - 1,
+
+			Entry: leader.State.Log[msg_to_send],
+
+			LeaderCommit: last_log,
+		}
+		append_message_rply := gorp_rpc.AppendMessageReply{}
+		err := client.Call("Broker.AppendMessage", append_message_args, &append_message_rply)
+
+		if err != nil {
+			return
+		}
+
+		// update the next log to send
+		if append_message_rply.Success {
+			leader.nextIndex[host]++
+		} else {
+			leader.nextIndex[host]--
+		}
+		msg_to_send = leader.nextIndex[host]
+
+		// check that we are up-to-date
+		up_to_date = last_log+1 == leader.nextIndex[host]
+	}
+
+	prev_term := -1
+	if msg_to_send != 0 {
+		prev_term = leader.State.Log[msg_to_send-1].Term
+	}
+
+	append_message_args := gorp_rpc.AppendMessage{
+		Term:     leader.State.CommitTerm,
+		LeaderId: leader.State.Host,
+
+		PrevLogTerm:  prev_term,
+		PrevLogIndex: msg_to_send - 1,
+
+		Entry: msg,
+
+		LeaderCommit: last_log,
+	}
+	append_message_rply := gorp_rpc.AppendMessageReply{}
+
+	err = client.Call("Broker.AppendMessage", append_message_args, &append_message_rply)
+	if err != nil {
+		return
+	}
+
+	// send if it was successsful
+	success <- append_message_rply.Success
+}
+
+// In its current form, this implementation may cause issues, cancelling
+// normally functioning appends when a majority is achieved. This needs further
+// testing, but it should still offer certainty that a majority has replicated
+// any one log message.
+func (leader *Leader) replicate(parent_ctx context.Context, msg gorp.LogEntry) {
+
+	ctx, cancel := context.WithCancel(parent_ctx)
+
+	// query machines
+	accepted := make(chan bool)
+	for _, host := range leader.State.Config {
+		if host == leader.State.Host {
+			continue
+		}
+
+		// send message to machines, get response through accepted channel
+		go leader.append_to_machine(ctx, accepted, host, msg)
+	}
+
+	majority := NumMajority(leader)
+	vote_count := 0
+
+	for {
+		select {
+		case success := <-accepted:
+
+			if success {
+				vote_count++
+			}
+
+			if vote_count > majority {
+				// stop all the machines from trying to update,
+				// if a machine is unable to be updated in the allotted time
+				// before a majority, then the next time a message comes in it can
+				// have another go, with hopefully an already more up-to-date system
+				cancel()
+				return
+			}
+
+		case <-ctx.Done():
+			cancel()
+			return
+		}
+	}
 
 }
 
@@ -124,8 +224,9 @@ func (leader *Leader) Execute(ctx context.Context) {
 
 	for {
 		select {
+		// when we have a message that needs replicating
 		case msg := <-leader.msgs:
-			leader.replicate(msg)
+			leader.replicate(ctx, msg)
 		case <-ctx.Done():
 			return
 		}
