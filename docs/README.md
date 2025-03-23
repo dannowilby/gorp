@@ -13,11 +13,11 @@ A distributed photo storage implemented with Raft [1].
 - [x] **Leadership consensus** - if a system is disturbed in some way, like a
   network partition or leader crash, then the system needs to recover in a
   timely way. This is done through an election.
+- [ ] **Log replication** - the follower logs needs to heal themselves to be
+  up-to-date from the leader's logs. This is done through an inductive process.
 - [ ] **Config changes** - special messages can be passed that define updated
   network configurations. The new set of hosts in the configuration will be
   transitioned to while perserving the protocol invariants.
-- [ ] **Log replication** - the follower logs needs to heal themselves to be
-  up-to-date from the leader's logs. This is done through an inductive process.
 - [ ] **Log compaction** - snapshots of the machine's log need to be stored on
   disk to save space and allow better recoverability/resiliency from crashes
 
