@@ -49,24 +49,7 @@ func (candidate *Candidate) RequestVote(msg gorp_rpc.RequestVoteMessage, rply *g
 	// we are able to vote, so unlock
 	candidate.Requesting.Unlock()
 
-	// msg not new enough
-	if msg.Term < candidate.State.CommitTerm {
-		rply.Term = candidate.State.CommitTerm
-		rply.VoteGranted = false
-		return nil
-	}
-
-	// check that this machine has not voted for a different one this term
-	if candidate.State.VotedFor != "" && candidate.State.VotedFor != msg.CandidateId {
-		rply.Term = candidate.State.CommitTerm
-		rply.VoteGranted = false
-		return nil
-	}
-
-	log := candidate.State.Log
-
-	// check if its up-to-date
-	if len(log) > 0 && (msg.LastLogIndex < candidate.State.LastApplied || msg.LastLogTerm < log[len(log)-1].Term) {
+	if !gorp_rpc.CanVoteFor(candidate.State, &msg) || !gorp_rpc.VoteMsgIsUpToDate(candidate.State, &msg) {
 		rply.Term = candidate.State.CommitTerm
 		rply.VoteGranted = false
 		return nil
@@ -88,21 +71,10 @@ func (candidate *Candidate) RequestVote(msg gorp_rpc.RequestVoteMessage, rply *g
 // Turn to follower if term is equal to or less than the message term
 func (candidate *Candidate) AppendMessage(message gorp_rpc.AppendMessage, reply *gorp_rpc.AppendMessageReply) error {
 
-	// check that the leader term is acceptable
-	if message.Term < candidate.State.CommitTerm {
+	if !gorp_rpc.AppendMessageIsUpToDate(candidate.State, &message) || !gorp_rpc.PrevLogsMatch(candidate.State, &message) {
 		reply.CommitTerm = candidate.State.CommitTerm
 		reply.Success = false
 		return nil
-	}
-
-	// if the log at the previous index does not contain the same term, then
-	// return false
-	if message.PrevLogIndex != -1 {
-		if len(candidate.State.Log)-1 < message.PrevLogIndex || candidate.State.Log[message.PrevLogTerm].Term != message.PrevLogTerm {
-			reply.CommitTerm = candidate.State.CommitTerm
-			reply.Success = false
-			return nil
-		}
 	}
 
 	// unlike the follower, we don't modify anything else

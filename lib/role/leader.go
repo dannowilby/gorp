@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"net/rpc"
 	"time"
 
@@ -22,6 +23,8 @@ type Leader struct {
 
 	// index of highest log entry known to be replicated on the server
 	matchIndex map[string]int
+
+	ChangeSignal chan Role
 }
 
 func (leader *Leader) Init(state *gorp.State) Role {
@@ -45,6 +48,23 @@ func (leader *Leader) RequestVote(msg gorp_rpc.RequestVoteMessage, rply *gorp_rp
 }
 
 func (leader *Leader) AppendMessage(msg gorp_rpc.AppendMessage, rply *gorp_rpc.AppendMessageReply) error {
+	if !gorp_rpc.AppendMessageIsUpToDate(leader.State, &msg) || !gorp_rpc.PrevLogsMatch(leader.State, &msg) {
+		rply.CommitTerm = leader.State.CommitTerm
+		rply.Success = false
+		return nil
+	}
+
+	// unlike the follower, we don't modify anything else
+	// this allows all the behavior that handles log synchronization by the
+	// follower role
+
+	rply.CommitTerm = leader.State.CommitTerm
+	rply.Success = true
+
+	slog.Debug("changing from leader to follower", "host", leader.State.Host)
+
+	leader.ChangeSignal <- new(Follower).Init(leader.State)
+
 	return nil
 }
 
@@ -68,7 +88,13 @@ func (leader *Leader) SendHeartbeats(ctx context.Context) {
 				return
 			}
 
-			append_message_args := gorp_rpc.AppendMessage{Term: leader.State.CommitTerm, LeaderId: leader.State.Host}
+			append_message_args := gorp_rpc.AppendMessage{
+				Term:         leader.State.CommitTerm,
+				LeaderId:     leader.State.Host,
+				PrevLogIndex: -1,
+				PrevLogTerm:  -1,
+				LeaderCommit: leader.State.CommitIndex,
+			}
 			append_message_rply := gorp_rpc.AppendMessageReply{}
 			client.Go("Broker.AppendMessage", append_message_args, &append_message_rply, nil)
 		}
@@ -109,7 +135,7 @@ func (leader *Leader) append_to_machine(ctx context.Context, success chan bool, 
 	for up_to_date {
 
 		prev_term := -1
-		if msg_to_send != 0 {
+		if msg_to_send != -1 {
 			prev_term = leader.State.Log[msg_to_send-1].Term
 		}
 
@@ -236,9 +262,12 @@ func (leader *Leader) Execute(ctx context.Context) {
 
 func (leader *Leader) NextRole(ctx context.Context) (Role, error) {
 
-	<-ctx.Done()
-
-	return nil, errors.New("cancelled")
+	select {
+	case next_role := <-leader.ChangeSignal:
+		return next_role, nil
+	case <-ctx.Done():
+		return nil, errors.New("cancelled")
+	}
 }
 
 func (leader *Leader) GetState() *gorp.State {

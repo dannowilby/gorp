@@ -41,32 +41,27 @@ func (follower *Follower) AppendMessage(message gorp_rpc.AppendMessage, reply *g
 	follower.last_request = time.Now()
 	follower.last_request_lock.Unlock()
 
-	// check that the leader term is acceptable
-	if message.Term < follower.State.CommitTerm {
+	if !gorp_rpc.AppendMessageIsUpToDate(follower.State, &message) || !gorp_rpc.PrevLogsMatch(follower.State, &message) {
 		reply.CommitTerm = follower.State.CommitTerm
 		reply.Success = false
 		return nil
 	}
 
-	// if the log at the previous index does not contain the same term, then
-	// return false
-	if message.PrevLogIndex != -1 {
-		if len(follower.State.Log)-1 < message.PrevLogIndex || follower.State.Log[message.PrevLogTerm].Term != message.PrevLogTerm {
-			reply.CommitTerm = follower.State.CommitTerm
-			reply.Success = false
-			return nil
+	// if this isn't a standard heartbeat, then update log
+	var empty_log gorp.LogEntry
+	if message.Entry != empty_log {
+
+		// the previous message matches, now append the new messages, removing any
+		// existing logs with conflicting index
+		follower.State.Log = follower.State.Log[0:(message.PrevLogIndex + 1)]
+		follower.State.Log = append(follower.State.Log, message.Entry)
+
+		// set commit index
+		if message.LeaderCommit > follower.State.CommitIndex {
+			// we update our commit index
+			follower.State.CommitIndex = min(message.LeaderCommit, len(follower.State.Log)-1)
 		}
-	}
 
-	// the previous message matches, now append the new messages, removing any
-	// existing logs with conflicting index
-	follower.State.Log = follower.State.Log[0:(message.PrevLogIndex + 1)]
-	follower.State.Log = append(follower.State.Log, message.Entry)
-
-	// set commit index
-	if message.LeaderCommit > follower.State.CommitIndex {
-		// we update our commit index
-		follower.State.CommitIndex = min(message.LeaderCommit, len(follower.State.Log)-1)
 	}
 
 	reply.CommitTerm = follower.State.CommitTerm
@@ -84,24 +79,7 @@ func (follower *Follower) RequestVote(msg gorp_rpc.RequestVoteMessage, rply *gor
 
 	slog.Debug("Request received on follower!")
 
-	// msg not new enough
-	if msg.Term < follower.State.CommitTerm {
-		rply.Term = follower.State.CommitTerm
-		rply.VoteGranted = false
-		return nil
-	}
-
-	// check that this machine has not voted for a different one this term
-	if follower.State.VotedFor != "" && follower.State.VotedFor != msg.CandidateId {
-		rply.Term = follower.State.CommitTerm
-		rply.VoteGranted = false
-		return nil
-	}
-
-	log := follower.State.Log
-
-	// check if its up-to-date
-	if len(log) > 0 && (msg.LastLogIndex < follower.State.LastApplied || msg.LastLogTerm < log[len(log)-1].Term) {
+	if !gorp_rpc.CanVoteFor(follower.State, &msg) || !gorp_rpc.VoteMsgIsUpToDate(follower.State, &msg) {
 		rply.Term = follower.State.CommitTerm
 		rply.VoteGranted = false
 		return nil
