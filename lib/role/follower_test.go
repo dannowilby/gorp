@@ -39,9 +39,8 @@ func TestCanAppendMessageFollowerOneAhead(t *testing.T) {
 	logs = append(logs, gorp.LogEntry{Term: 0, Message: "Existing 2."})
 
 	state := gorp.State{Log: logs, CommitIndex: 1, LastApplied: 1}
-	role := Follower{State: &state}
-
 	state.CommitTerm = 1
+	role := new(Follower).Init(&state)
 
 	msg := gorp_rpc.AppendMessage{Term: 1, PrevLogIndex: 0, PrevLogTerm: 0, Entry: gorp.LogEntry{Term: 1, Message: "simple message"}}
 

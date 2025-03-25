@@ -150,8 +150,7 @@ func (candidate *Candidate) Execute(ctx context.Context) {
 	// vote counting mechanism
 	votes := make(chan bool)
 
-	total_votes := len(candidate.State.Config)
-	votes_needed := (total_votes / 2) + 1
+	votes_needed := gorp.NumMajority(candidate.State)
 	vote_tally := 1
 	votes_received := 0
 
@@ -164,7 +163,6 @@ func (candidate *Candidate) Execute(ctx context.Context) {
 
 		// request vote from each machine in config
 		go candidate.SendRequest(timeout_ctx, votes, element)
-
 	}
 
 	// wait for votes to come in

@@ -215,7 +215,7 @@ func (leader *Leader) replicate(parent_ctx context.Context, msg gorp.LogEntry) {
 		go leader.append_to_machine(ctx, accepted, host, msg)
 	}
 
-	majority := NumMajority(leader)
+	majority := gorp.NumMajority(leader.State)
 	vote_count := 0
 
 	for {

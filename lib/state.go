@@ -32,3 +32,9 @@ type State struct {
 	// losing an election
 	RandomizedTimeout []int `json:"randomizedTimeout"`
 }
+
+// Get the number of machines needed for a majority, does remove the calling
+// machine from the majority. AKA the number of separate machines needed for a majority.
+func NumMajority(state *State) int {
+	return ((len(state.Config) + 1) / 2) - 1
+}
