@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"log/slog"
 	"net/rpc"
 	"time"
 
@@ -31,6 +30,7 @@ func (leader *Leader) Init(state *gorp.State) Role {
 	leader.State = state
 	leader.State.Role = "leader"
 	leader.msgs = make(chan gorp.LogEntry, 10)
+	leader.ChangeSignal = make(chan Role, 1)
 
 	leader.nextIndex = make(map[string]int)
 	leader.matchIndex = make(map[string]int)
@@ -44,11 +44,17 @@ func (leader *Leader) Init(state *gorp.State) Role {
 }
 
 func (leader *Leader) RequestVote(msg gorp_rpc.RequestVoteMessage, rply *gorp_rpc.RequestVoteReply) error {
+	if gorp_rpc.VoteMsgIsMoreUpToDate(leader.State, &msg) {
+		rply.VoteGranted = true
+		rply.Term = leader.State.CommitTerm
+		return nil
+	}
+
 	return nil
 }
 
 func (leader *Leader) AppendMessage(msg gorp_rpc.AppendMessage, rply *gorp_rpc.AppendMessageReply) error {
-	if !gorp_rpc.AppendMessageIsUpToDate(leader.State, &msg) || !gorp_rpc.PrevLogsMatch(leader.State, &msg) {
+	if !gorp_rpc.AppendMessageIsNewer(leader.State, &msg) || !gorp_rpc.PrevLogsMatch(leader.State, &msg) {
 		rply.CommitTerm = leader.State.CommitTerm
 		rply.Success = false
 		return nil
@@ -60,8 +66,6 @@ func (leader *Leader) AppendMessage(msg gorp_rpc.AppendMessage, rply *gorp_rpc.A
 
 	rply.CommitTerm = leader.State.CommitTerm
 	rply.Success = true
-
-	slog.Debug("changing from leader to follower", "host", leader.State.Host)
 
 	leader.ChangeSignal <- new(Follower).Init(leader.State)
 
@@ -263,10 +267,10 @@ func (leader *Leader) Execute(ctx context.Context) {
 func (leader *Leader) NextRole(ctx context.Context) (Role, error) {
 
 	select {
-	case next_role := <-leader.ChangeSignal:
-		return next_role, nil
 	case <-ctx.Done():
 		return nil, errors.New("cancelled")
+	case next_role := <-leader.ChangeSignal:
+		return next_role, nil
 	}
 }
 
