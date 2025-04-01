@@ -119,6 +119,8 @@ func (leader *Leader) SendHeartbeats(ctx context.Context) {
 // Updates the machine and tries to append
 func (leader *Leader) append_to_machine(ctx context.Context, success chan bool, host string, msg gorp.LogEntry) {
 
+	fmt.Println("appending")
+
 	client, err := rpc.DialHTTPPath("tcp", host, "/")
 
 	if err != nil {
@@ -133,14 +135,16 @@ func (leader *Leader) append_to_machine(ctx context.Context, success chan bool, 
 	// send the log
 
 	last_log := leader.State.CommitIndex
+
 	msg_to_send := leader.nextIndex[host]
 
 	up_to_date := false
-	for up_to_date {
+	for !up_to_date {
 
+		prev_index := msg_to_send - 1
 		prev_term := -1
-		if msg_to_send != -1 {
-			prev_term = leader.State.Log[msg_to_send-1].Term
+		if prev_index > 0 {
+			prev_term = leader.State.Log[prev_index].Term
 		}
 
 		append_message_args := gorp_rpc.AppendMessage{
@@ -148,14 +152,16 @@ func (leader *Leader) append_to_machine(ctx context.Context, success chan bool, 
 			LeaderId: leader.State.Host,
 
 			PrevLogTerm:  prev_term,
-			PrevLogIndex: msg_to_send - 1,
+			PrevLogIndex: prev_index,
 
 			Entry: leader.State.Log[msg_to_send],
 
 			LeaderCommit: last_log,
 		}
+
 		append_message_rply := gorp_rpc.AppendMessageReply{}
 		err := client.Call("Broker.AppendMessage", append_message_args, &append_message_rply)
+		fmt.Println("sending", msg_to_send, ",", append_message_rply.Success)
 
 		if err != nil {
 			return
@@ -225,7 +231,7 @@ func (leader *Leader) replicate(parent_ctx context.Context, msg gorp.LogEntry) {
 	for {
 		select {
 		case success := <-accepted:
-
+			fmt.Println("received vote back", success)
 			if success {
 				vote_count++
 			}
@@ -234,7 +240,11 @@ func (leader *Leader) replicate(parent_ctx context.Context, msg gorp.LogEntry) {
 				// stop all the machines from trying to update,
 				// if a machine is unable to be updated in the allotted time
 				// before a majority, then the next time a message comes in it can
-				// have another go, with hopefully an already more up-to-date system
+				// have another go, with hopefully an already more up-to-date
+				// system
+				leader.State.Log = append(leader.State.Log, msg)
+				leader.State.CommitIndex += 1
+				// apply the log
 				cancel()
 				return
 			}
@@ -252,10 +262,14 @@ func (leader *Leader) Execute(ctx context.Context) {
 	// start continuously heartbeating
 	go leader.SendHeartbeats(ctx)
 
+	<-time.After(10 * time.Millisecond)
+	leader.msgs <- gorp.LogEntry{Term: 1, Message: "test 2"}
+
 	for {
 		select {
 		// when we have a message that needs replicating
 		case msg := <-leader.msgs:
+			fmt.Println("replicating")
 			leader.replicate(ctx, msg)
 		case <-ctx.Done():
 			return

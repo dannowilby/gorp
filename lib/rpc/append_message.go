@@ -1,6 +1,8 @@
 package gorp_rpc
 
-import gorp "github.com/dannowilby/gorp/lib"
+import (
+	gorp "github.com/dannowilby/gorp/lib"
+)
 
 type AppendMessage struct {
 	Term     int
@@ -34,7 +36,8 @@ func AppendMessageIsUpToDate(state *gorp.State, msg *AppendMessage) bool {
 func PrevLogsMatch(state *gorp.State, msg *AppendMessage) bool {
 
 	if msg.PrevLogIndex != -1 {
-		if len(state.Log)-1 < msg.PrevLogIndex || state.Log[msg.PrevLogTerm].Term != msg.PrevLogTerm {
+		if len(state.Log)-1 < msg.PrevLogIndex ||
+			state.Log[msg.PrevLogIndex].Term != msg.PrevLogTerm {
 			return false
 		}
 	}
