@@ -8,7 +8,6 @@ import (
 	"math/rand"
 	"net/rpc"
 	"strconv"
-	"sync"
 	"time"
 
 	gorp "github.com/dannowilby/gorp/lib"
@@ -17,8 +16,6 @@ import (
 
 type Candidate struct {
 	State *gorp.State
-
-	Requesting sync.Mutex
 
 	ChangeSignal chan Role
 }
@@ -33,21 +30,9 @@ func (candidate *Candidate) Init(state *gorp.State) Role {
 	return candidate
 }
 
-// If this machine has already requested votes, then do nothing
 func (candidate *Candidate) RequestVote(msg gorp_rpc.RequestVoteMessage, rply *gorp_rpc.RequestVoteReply) error {
 
 	slog.Debug("Request received on candidate!")
-
-	// if we are actively trying to get votes, don't allow it to vote for others
-	if !candidate.Requesting.TryLock() {
-
-		rply.Term = candidate.State.CommitTerm
-		rply.VoteGranted = false
-
-		return nil
-	}
-	// we are able to vote, so unlock
-	candidate.Requesting.Unlock()
 
 	if !gorp_rpc.CanVoteFor(candidate.State, &msg) || !gorp_rpc.VoteMsgIsUpToDate(candidate.State, &msg) {
 		rply.Term = candidate.State.CommitTerm
@@ -55,8 +40,6 @@ func (candidate *Candidate) RequestVote(msg gorp_rpc.RequestVoteMessage, rply *g
 		return nil
 	}
 
-	// We have timed out and lost the election, now we should only vote for one
-	// other machine
 	candidate.State.VotedFor = msg.CandidateId
 
 	// grant the vote
@@ -130,20 +113,28 @@ func (candidate *Candidate) SendRequest(ctx context.Context, vote_status chan bo
 
 func (candidate *Candidate) Execute(ctx context.Context) {
 
-	// we want to start the timeout before starting an election
-	// and then vote for itself and try to gather votes after
-	// if no other candidates want votes
-
-	candidate.Requesting.Lock()
-
 	// Transitioning to this state, we immediately update the term
 	candidate.State.CommitTerm += 1
 
-	// create timeouts, election timeout is standard, timeout after the election is random
-	election_timeout_duration, t1_err := time.ParseDuration(strconv.Itoa(candidate.State.ElectionTimeout) + "ms")
+	// create initial randomized timeout
 	timeout_duration, t2_err := time.ParseDuration(strconv.Itoa(
 		candidate.State.RandomizedTimeout[0]+rand.Intn(candidate.State.RandomizedTimeout[1]-candidate.State.RandomizedTimeout[0])) + "ms")
-	if t1_err != nil || t2_err != nil {
+	if t2_err != nil {
+		// have yet to implement proper error handling
+		panic("please implement proper error handling please, config is probably bad")
+	}
+	<-time.After(timeout_duration)
+
+	// if already voted for another machine, don't try gathering votes
+	if candidate.State.VotedFor != "" && candidate.State.VotedFor != candidate.State.Host {
+		return
+	}
+
+	// vote for self
+	candidate.State.VotedFor = candidate.State.Host
+
+	election_timeout_duration, t1_err := time.ParseDuration(strconv.Itoa(candidate.State.ElectionTimeout) + "ms")
+	if t1_err != nil {
 		// have yet to implement proper error handling
 		panic("please implement proper error handling please, config is probably bad")
 	}
@@ -170,7 +161,6 @@ func (candidate *Candidate) Execute(ctx context.Context) {
 	}
 
 	// wait for votes to come in
-	// we could use a loop label, but I don't like those
 	completed := false
 	for !completed {
 		select {
@@ -179,31 +169,23 @@ func (candidate *Candidate) Execute(ctx context.Context) {
 			cancel()
 			return
 		case <-time.After(election_timeout_duration):
-			// if we've timed out, break out of the requests
-			// start a new timeout, and then return a new candidate if no new
-			// leader has been elected otherwise
+			// oh no, we've timed out
 			completed = true
 
 		case vote := <-votes:
 			votes_received += 1
-			// add the vote to the tally
+
 			if vote {
 				vote_tally += 1
 			}
 
-			// if we have enough votes, break and become leader
-			// TODO: exit early if winning is impossible
-			won_vote := vote_tally >= votes_needed
-
-			completed = won_vote
+			completed = vote_tally >= votes_needed
 		}
 	}
 
 	slog.Debug("vote counts", "votes tally", vote_tally, "votes received", votes_received, "votes needed", votes_needed)
 
-	// for some reason, we decided that either we have enough, or we've timed out
 	cancel()
-	candidate.Requesting.Unlock()
 
 	// if a majority accept, then transition to a leader and sends heartbeats to
 	// enforce its authority
@@ -212,8 +194,6 @@ func (candidate *Candidate) Execute(ctx context.Context) {
 		return
 	}
 
-	// if a majority does not occur, then time out, start a new term trying again
-	<-time.After(timeout_duration)
 	candidate.ChangeSignal <- new(Candidate).Init(candidate.State)
 }
 
