@@ -71,7 +71,7 @@ func (candidate *Candidate) RequestVote(msg gorp_rpc.RequestVoteMessage, rply *g
 // Turn to follower if term is equal to or less than the message term
 func (candidate *Candidate) AppendMessage(message gorp_rpc.AppendMessage, reply *gorp_rpc.AppendMessageReply) error {
 
-	if !gorp_rpc.AppendMessageIsUpToDate(candidate.State, &message) || !gorp_rpc.PrevLogsMatch(candidate.State, &message) {
+	if !gorp_rpc.AppendMessageIsUpToDate(candidate.State, &message) {
 		reply.CommitTerm = candidate.State.CommitTerm
 		reply.Success = false
 		return nil
@@ -129,6 +129,10 @@ func (candidate *Candidate) SendRequest(ctx context.Context, vote_status chan bo
 }
 
 func (candidate *Candidate) Execute(ctx context.Context) {
+
+	// we want to start the timeout before starting an election
+	// and then vote for itself and try to gather votes after
+	// if no other candidates want votes
 
 	candidate.Requesting.Lock()
 

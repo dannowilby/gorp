@@ -44,7 +44,7 @@ func (leader *Leader) Init(state *gorp.State) Role {
 }
 
 func (leader *Leader) RequestVote(msg gorp_rpc.RequestVoteMessage, rply *gorp_rpc.RequestVoteReply) error {
-	if gorp_rpc.VoteMsgIsMoreUpToDate(leader.State, &msg) {
+	if gorp_rpc.VoteMsgIsUpToDate(leader.State, &msg) {
 		rply.VoteGranted = true
 		rply.Term = leader.State.CommitTerm
 		return nil
@@ -54,7 +54,7 @@ func (leader *Leader) RequestVote(msg gorp_rpc.RequestVoteMessage, rply *gorp_rp
 }
 
 func (leader *Leader) AppendMessage(msg gorp_rpc.AppendMessage, rply *gorp_rpc.AppendMessageReply) error {
-	if !gorp_rpc.AppendMessageIsNewer(leader.State, &msg) || !gorp_rpc.PrevLogsMatch(leader.State, &msg) {
+	if !gorp_rpc.AppendMessageIsNewer(leader.State, &msg) {
 		rply.CommitTerm = leader.State.CommitTerm
 		rply.Success = false
 		return nil

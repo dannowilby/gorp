@@ -18,7 +18,7 @@
         },
         {
             "host": "localhost:1236",
-            "commitTerm": 3,
+            "commitTerm": 1,
             "electionTimeout": 500,
             "randomizedTimeout": [150, 300],
             "config": [ "localhost:1234", "localhost:1235", "localhost:1236" ],
