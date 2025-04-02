@@ -242,9 +242,11 @@ func (leader *Leader) replicate(parent_ctx context.Context, msg gorp.LogEntry) {
 				// before a majority, then the next time a message comes in it can
 				// have another go, with hopefully an already more up-to-date
 				// system
+
+				// append and apply the log
 				leader.State.Log = append(leader.State.Log, msg)
 				leader.State.CommitIndex += 1
-				// apply the log
+
 				cancel()
 				return
 			}
