@@ -3,9 +3,8 @@
         {
             "host": "localhost:1234",
             "commitTerm": 1,
-            "commitIndex": 0,
-            "lastApplied": 0,
-            "log": [ { "term": 1, "message": "test" } ],
+            "commitIndex": -1,
+            "lastApplied": -1,
             "electionTimeout": 500,
             "randomizedTimeout": [150, 300],
             "config": [ "localhost:1234", "localhost:1235", "localhost:1236" ],

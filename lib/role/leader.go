@@ -143,7 +143,7 @@ func (leader *Leader) append_to_machine(ctx context.Context, success chan bool, 
 
 		prev_index := msg_to_send - 1
 		prev_term := -1
-		if prev_index > 0 {
+		if prev_index > -1 {
 			prev_term = leader.State.Log[prev_index].Term
 		}
 
@@ -161,7 +161,7 @@ func (leader *Leader) append_to_machine(ctx context.Context, success chan bool, 
 
 		append_message_rply := gorp_rpc.AppendMessageReply{}
 		err := client.Call("Broker.AppendMessage", append_message_args, &append_message_rply)
-		fmt.Println("sending", msg_to_send, ",", append_message_rply.Success)
+		fmt.Println("sending", msg_to_send, ",", append_message_rply.Success, ",", host, ",", prev_term, ",", prev_index)
 
 		if err != nil {
 			return
@@ -263,9 +263,8 @@ func (leader *Leader) Execute(ctx context.Context) {
 
 	// start continuously heartbeating
 	go leader.SendHeartbeats(ctx)
-
 	<-time.After(10 * time.Millisecond)
-	leader.msgs <- gorp.LogEntry{Term: 1, Message: "test 2"}
+	leader.msgs <- gorp.LogEntry{Term: leader.State.CommitTerm, Message: "test"}
 
 	for {
 		select {
