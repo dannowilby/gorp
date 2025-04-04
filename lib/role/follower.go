@@ -67,6 +67,7 @@ func (follower *Follower) AppendMessage(message gorp_rpc.AppendMessage, reply *g
 	reply.CommitTerm = follower.State.CommitTerm
 	reply.Success = true
 
+	follower.State.CommitTerm = message.Term
 	// apply log to state machine, right now, this isn't implemented yet. This
 	// might also require reversing applied messages if this replica had become
 	// out of sync with the leader
