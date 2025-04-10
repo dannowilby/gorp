@@ -2,14 +2,22 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"flag"
+	"fmt"
 	"log/slog"
 	"os"
+	"os/signal"
 	"strings"
+	"syscall"
 
 	gorp "github.com/dannowilby/gorp/lib"
 	gorp_role "github.com/dannowilby/gorp/lib/role"
 )
+
+type Config struct {
+	Replicas []gorp.State `json:"replicas"`
+}
 
 func Run(ctx context.Context, state *gorp.State) error {
 
@@ -70,14 +78,70 @@ func configure_log() {
 	slog.SetDefault(logger)
 }
 
+func load_config(path string) (*Config, error) {
+
+	f, err := os.Open(path)
+	if err != nil {
+		return nil, err
+	}
+
+	var replicas Config
+	jsonParser := json.NewDecoder(f)
+	if err := jsonParser.Decode(&replicas); err != nil {
+		return nil, err
+	}
+
+	return &replicas, nil
+}
+
 func main() {
 	configure_log()
 
-	state := gorp.State{ElectionTimeout: 500}
+	local := flag.Bool("local", true, "Run the config locally")
+	config := flag.String("config", "config.local.json", "Load cluster config from a JSON file")
 
-	if err := Run(context.Background(), &state); err != nil {
-		slog.Error("error, exiting", "error", err)
-	} else {
-		slog.Info("Shutting down gracefully.")
+	var replicas *Config
+
+	if *config != "" {
+		loaded, err := load_config(*config)
+		if err != nil {
+			slog.Error("error, exiting", "error", err)
+			return
+		}
+		replicas = loaded
 	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+
+	if *local {
+		for i := range replicas.Replicas {
+
+			// print the replicas initial state
+			fmt.Println(&replicas.Replicas[i])
+
+			go Run(ctx, &replicas.Replicas[i])
+		}
+
+	} else {
+		// find a way to decide which replica in the config we are running
+	}
+
+	c := make(chan os.Signal, 1)
+	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
+	go func() {
+		<-c
+		cancel()
+	}()
+
+	<-c
+	fmt.Println("\n\nExiting...")
+
+	if *local {
+		for i := range replicas.Replicas {
+			fmt.Println(&replicas.Replicas[i])
+		}
+	} else {
+		// only print the host replica
+	}
+
 }
