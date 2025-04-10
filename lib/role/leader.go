@@ -2,9 +2,14 @@ package gorp_role
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"log"
+	"net/http"
 	"net/rpc"
+	"strconv"
+	"strings"
 	"time"
 
 	gorp "github.com/dannowilby/gorp/lib"
@@ -40,6 +45,8 @@ func (leader *Leader) Init(state *gorp.State) Role {
 		leader.nextIndex[server] = len(leader.State.Log)
 		leader.matchIndex[server] = 0
 	}
+
+	fmt.Println("Leader:", leader.State.Host)
 
 	return leader
 }
@@ -263,10 +270,63 @@ func (leader *Leader) replicate(parent_ctx context.Context, msg gorp.LogEntry) {
 
 }
 
+type ClientMessage struct {
+	Message string `json:"message"`
+}
+
+func (leader *Leader) AcceptClientRequest(ctx context.Context) {
+	rpc_port, err := strconv.Atoi(strings.Split(leader.State.Host, ":")[1])
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+	port := rpc_port + 3000
+
+	// Create a simple handler that responds with a message
+	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		var client_message ClientMessage
+		err := json.NewDecoder(r.Body).Decode(&client_message)
+		if err != nil {
+			w.WriteHeader(400)
+		}
+
+		leader.msgs <- gorp.LogEntry{Term: leader.State.CommitTerm, Message: client_message.Message}
+		w.WriteHeader(200)
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode("Message queued to be saved.")
+	})
+
+	// Configure the server
+	server := &http.Server{
+		Addr:    fmt.Sprintf(":%d", port),
+		Handler: nil, // Use the default ServeMux
+	}
+
+	// Start server in a goroutine so it doesn't block
+	go func() {
+		fmt.Printf("Server starting on port %d...\n", port)
+		if err := server.ListenAndServe(); err != http.ErrServerClosed {
+			log.Fatalf("Server error: %v", err)
+		}
+	}()
+
+	<-ctx.Done()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Millisecond)
+	defer cancel()
+
+	if err := server.Shutdown(ctx); err != nil {
+		log.Fatalf("Server forced to shutdown: %v", err)
+	}
+}
+
 func (leader *Leader) Execute(ctx context.Context) {
 
 	// start continuously heartbeating
 	go leader.SendHeartbeats(ctx)
+
+	// listen for user messages
+	go leader.AcceptClientRequest(ctx)
 
 	for {
 		select {
