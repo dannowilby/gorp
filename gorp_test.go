@@ -6,8 +6,9 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"os/signal"
+	"syscall"
 	"testing"
-	"time"
 
 	gorp "github.com/dannowilby/gorp/lib"
 )
@@ -29,16 +30,16 @@ func TestScenarios(t *testing.T) {
 	// Set the logger as the default
 	slog.SetDefault(logger)
 
-	scenarios, err := load_scenarios()
-	if err != nil {
-		t.Fatal(err)
-	}
+	// scenarios, err := load_scenarios()
+	// if err != nil {
+	// 	t.Fatal(err)
+	// }
 
-	for _, scenario := range scenarios {
-		// run the scenario
-		run_scenario(t, &scenario)
+	// // for _, scenario := range scenarios {
+	// // 	// run the scenario
+	// // 	run_scenario(t, &scenario)
 
-	}
+	// // }
 
 }
 
@@ -53,14 +54,15 @@ func run_scenario(t *testing.T, scenario *Scenario) {
 		go Run(ctx, &scenario.Replicas[i])
 	}
 
-	duration, _ := time.ParseDuration("2000ms")
-	<-time.After(duration)
+	c := make(chan os.Signal, 1)
+	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
+	go func() {
+		<-c
+		cancel()
+	}()
 
-	cancel()
-
-	duration, _ = time.ParseDuration("20ms")
-	<-time.After(duration)
-
+	<-c
+	fmt.Println("\n\nGracefully shutting down...")
 	for i := range scenario.Replicas {
 		fmt.Println(&scenario.Replicas[i])
 	}

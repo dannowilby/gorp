@@ -2,33 +2,33 @@
     "replicas": [
         {
             "host": "localhost:1234",
-            "commitTerm": 1,
+            "commitTerm": -1,
             "commitIndex": -1,
             "lastApplied": -1,
             "electionTimeout": 500,
             "randomizedTimeout": [150, 300],
             "config": [ "localhost:1234", "localhost:1235", "localhost:1236" ],
-            "role": "leader"
+            "role": "candidate"
         },
         {
             "host": "localhost:1235",
-            "commitTerm": 1,
+            "commitTerm": -1,
             "commitIndex": -1,
             "lastApplied": -1,
             "electionTimeout": 500,
             "randomizedTimeout": [150, 300],
             "config": [ "localhost:1234", "localhost:1235", "localhost:1236" ],
-            "role": "follower"
+            "role": "candidate"
         },
         {
             "host": "localhost:1236",
-            "commitTerm": 1,
+            "commitTerm": -1,
             "commitIndex": -1,
             "lastApplied": -1,
             "electionTimeout": 500,
             "randomizedTimeout": [150, 300],
             "config": [ "localhost:1234", "localhost:1235", "localhost:1236" ],
-            "role": "follower"
+            "role": "candidate"
         }
     ],
     "expected": []

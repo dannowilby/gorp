@@ -48,8 +48,8 @@ func (follower *Follower) AppendMessage(message gorp_rpc.AppendMessage, reply *g
 	}
 
 	// if this isn't a standard heartbeat, then update log
-	var empty_log gorp.LogEntry
-	if message.Entry != empty_log {
+	empty_log := gorp.LogEntry{Term: -2}
+	if message.Entry.Term != empty_log.Term {
 
 		// the previous message matches, now append the new messages, removing any
 		// existing logs with conflicting index

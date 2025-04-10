@@ -63,9 +63,8 @@ func (candidate *Candidate) AppendMessage(message gorp_rpc.AppendMessage, reply 
 	// unlike the follower, we don't modify anything else
 	// this allows all the behavior that handles log synchronization by the
 	// follower role
-
 	reply.CommitTerm = candidate.State.CommitTerm
-	reply.Success = true
+	reply.Success = false
 
 	candidate.ChangeSignal <- new(Follower).Init(candidate.State)
 
