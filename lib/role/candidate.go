@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log/slog"
 	"math/rand"
+	"net/http"
 	"net/rpc"
 	"strconv"
 	"time"
@@ -97,6 +98,10 @@ func (candidate *Candidate) SendRequest(ctx context.Context, vote_status chan bo
 		vote_status <- request_vote_rply.VoteGranted
 	}
 
+}
+
+func (candidate *Candidate) HandleClient(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(200)
 }
 
 func (candidate *Candidate) Execute(ctx context.Context) {

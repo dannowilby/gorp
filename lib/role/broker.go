@@ -3,8 +3,10 @@ package gorp_role
 import (
 	"context"
 	"errors"
+	"fmt"
 	"net/http"
 	"net/rpc"
+	"strconv"
 	"strings"
 
 	gorp "github.com/dannowilby/gorp/lib"
@@ -23,6 +25,8 @@ type Role interface {
 	// Returns the next role to transition to
 	Execute(context.Context)
 
+	HandleClient(w http.ResponseWriter, r *http.Request)
+
 	GetChangeSignal() chan Role
 
 	// Used as a type check to ensure that the role has a relation
@@ -36,10 +40,11 @@ type Role interface {
 type Broker struct {
 	Role Role
 
-	server *http.Server
+	rpc_server    *http.Server
+	client_server *http.Server
 }
 
-func (broker *Broker) StartServer() {
+func (broker *Broker) StartRPCServer() {
 
 	router := mux.NewRouter()
 
@@ -48,17 +53,41 @@ func (broker *Broker) StartServer() {
 
 	router.Handle("/", server)
 
-	broker.server = &http.Server{
+	broker.rpc_server = &http.Server{
 		Addr:    broker.Role.GetState().Host,
 		Handler: router,
 	}
 
 	// start the RPC server
-	go broker.server.ListenAndServe()
+	go broker.rpc_server.ListenAndServe()
 }
 
-func (broker *Broker) StopServer() {
-	broker.server.Shutdown(context.Background())
+func (broker *Broker) StopRPCServer() {
+	broker.rpc_server.Shutdown(context.Background())
+}
+
+func (broker *Broker) StartClientServer() {
+	rpc_port, err := strconv.Atoi(strings.Split(broker.Role.GetState().Host, ":")[1])
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+	port := rpc_port + 3000
+
+	mux := http.NewServeMux()
+
+	mux.HandleFunc("/", broker.Role.HandleClient)
+
+	broker.client_server = &http.Server{
+		Addr:    fmt.Sprintf(":%d", port),
+		Handler: mux,
+	}
+
+	go broker.client_server.ListenAndServe()
+}
+
+func (broker *Broker) StopClientServer() {
+	broker.client_server.Shutdown(context.Background())
 }
 
 func (broker *Broker) RequestVote(rvm gorp_rpc.RequestVoteMessage, rvp *gorp_rpc.RequestVoteReply) error {

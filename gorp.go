@@ -27,7 +27,8 @@ func Run(ctx context.Context, state *gorp.State) error {
 
 		ctx, cancel := context.WithCancel(ctx)
 
-		replica.StartServer()
+		replica.StartRPCServer()
+		replica.StartClientServer()
 
 		// start executing replica housekeeping
 		go replica.Execute(ctx)
@@ -36,7 +37,9 @@ func Run(ctx context.Context, state *gorp.State) error {
 		next_role, err := replica.NextRole(ctx)
 
 		// shutdown server and execution thread
-		replica.StopServer()
+		replica.StopClientServer()
+		replica.StopRPCServer()
+
 		cancel()
 
 		// if it is changing to shutdown or an error happened,

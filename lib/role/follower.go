@@ -3,6 +3,7 @@ package gorp_role
 import (
 	"context"
 	"log/slog"
+	"net/http"
 	"sync"
 	"time"
 
@@ -98,6 +99,10 @@ func (follower *Follower) RequestVote(msg gorp_rpc.RequestVoteMessage, rply *gor
 	follower.last_request_lock.Unlock()
 
 	return nil
+}
+
+func (follower *Follower) HandleClient(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(200)
 }
 
 // Checks on the heartbeat and turns into a candidate if no pulse
