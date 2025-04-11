@@ -39,17 +39,6 @@ func VoteMsgIsUpToDate(state *gorp.State, msg *RequestVoteMessage) bool {
 	return terms_match && logs_match
 }
 
-func VoteMsgIsMoreUpToDate(state *gorp.State, msg *RequestVoteMessage) bool {
-	terms_match := msg.Term > state.CommitTerm
-
-	log := state.Log
-	// we are currently only checking if msg term is >= than state,
-	// we need to factor in log length
-	logs_match := !(len(log) > 0 && (msg.LastLogIndex < state.LastApplied || msg.LastLogTerm < log[len(log)-1].Term))
-
-	return terms_match && logs_match
-}
-
 func CanVoteFor(state *gorp.State, msg *RequestVoteMessage) bool {
 	return !(state.VotedFor != "" && state.VotedFor != msg.CandidateId)
 }

@@ -2,6 +2,7 @@ package gorp_role
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"net/rpc"
 	"strings"
@@ -18,11 +19,11 @@ type Role interface {
 	RequestVote(gorp_rpc.RequestVoteMessage, *gorp_rpc.RequestVoteReply) error
 	AppendMessage(gorp_rpc.AppendMessage, *gorp_rpc.AppendMessageReply) error
 
-	NextRole(context.Context) (Role, error)
-
 	// Used to implement the actual logic of the replicas/individual roles
 	// Returns the next role to transition to
 	Execute(context.Context)
+
+	GetChangeSignal() chan Role
 
 	// Used as a type check to ensure that the role has a relation
 	// to the underlying state object of the replica
@@ -73,7 +74,12 @@ func (broker *Broker) Execute(ctx context.Context) {
 }
 
 func (broker *Broker) NextRole(ctx context.Context) (Role, error) {
-	return broker.Role.NextRole(ctx)
+	select {
+	case <-ctx.Done():
+		return nil, errors.New("cancelled")
+	case next_role := <-broker.Role.GetChangeSignal():
+		return next_role, nil
+	}
 }
 
 func (broker *Broker) SwitchRole(role Role) {

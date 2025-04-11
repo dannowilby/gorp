@@ -2,7 +2,6 @@ package gorp_role
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"log/slog"
 	"math/rand"
@@ -69,16 +68,6 @@ func (candidate *Candidate) AppendMessage(message gorp_rpc.AppendMessage, reply 
 	candidate.ChangeSignal <- new(Follower).Init(candidate.State)
 
 	return nil
-}
-
-func (candidate *Candidate) NextRole(ctx context.Context) (Role, error) {
-
-	select {
-	case <-ctx.Done():
-		return nil, errors.New("cancelled")
-	case next_role := <-candidate.ChangeSignal:
-		return next_role, nil
-	}
 }
 
 func (candidate *Candidate) SendRequest(ctx context.Context, vote_status chan bool, element string) {
@@ -194,6 +183,10 @@ func (candidate *Candidate) Execute(ctx context.Context) {
 	}
 
 	candidate.ChangeSignal <- new(Candidate).Init(candidate.State)
+}
+
+func (candidate *Candidate) GetChangeSignal() chan Role {
+	return candidate.ChangeSignal
 }
 
 func (candidate *Candidate) GetState() *gorp.State {

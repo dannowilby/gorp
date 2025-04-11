@@ -2,7 +2,6 @@ package gorp_role
 
 import (
 	"context"
-	"errors"
 	"log/slog"
 	"sync"
 	"time"
@@ -101,15 +100,6 @@ func (follower *Follower) RequestVote(msg gorp_rpc.RequestVoteMessage, rply *gor
 	return nil
 }
 
-func (follower *Follower) NextRole(ctx context.Context) (Role, error) {
-	select {
-	case <-ctx.Done():
-		return nil, errors.New("cancelled")
-	case next_role := <-follower.ChangeSignal:
-		return next_role, nil
-	}
-}
-
 // Checks on the heartbeat and turns into a candidate if no pulse
 func (follower *Follower) Execute(ctx context.Context) {
 
@@ -144,6 +134,10 @@ func (follower *Follower) Execute(ctx context.Context) {
 		}
 	}
 
+}
+
+func (follower *Follower) GetChangeSignal() chan Role {
+	return follower.ChangeSignal
 }
 
 func (follower *Follower) GetState() *gorp.State {
