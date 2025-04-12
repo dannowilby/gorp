@@ -33,6 +33,19 @@ type State struct {
 	RandomizedTimeout []int `json:"randomizedTimeout"`
 }
 
+func EmptyState() State {
+	return State{
+		Host:              "localhost:1234",
+		Role:              "candidate",
+		ElectionTimeout:   500,
+		RandomizedTimeout: []int{150, 300},
+		Config:            []string{"localhost:1234"},
+		CommitTerm:        -1,
+		CommitIndex:       -1,
+		LastApplied:       -1,
+	}
+}
+
 // Get the number of machines needed for a majority, does remove the calling
 // machine from the majority. AKA the number of separate machines needed for a majority.
 func NumMajority(state *State) int {

@@ -78,6 +78,16 @@ func (broker *Broker) StartClientServer() {
 
 	mux.HandleFunc("/", broker.Role.HandleClient)
 
+	// Debug routes
+	mux.HandleFunc("/shutdown", func(w http.ResponseWriter, r *http.Request) {
+		broker.Role.GetChangeSignal() <- nil
+		w.WriteHeader(200)
+	})
+	mux.HandleFunc("/demote", func(w http.ResponseWriter, r *http.Request) {
+		broker.Role.GetChangeSignal() <- new(Follower).Init(broker.Role.GetState())
+		w.WriteHeader(200)
+	})
+
 	broker.client_server = &http.Server{
 		Addr:    fmt.Sprintf(":%d", port),
 		Handler: mux,
@@ -107,7 +117,10 @@ func (broker *Broker) NextRole(ctx context.Context) (Role, error) {
 	case <-ctx.Done():
 		return nil, errors.New("cancelled")
 	case next_role := <-broker.Role.GetChangeSignal():
-		return next_role, nil
+		if next_role != nil {
+			return next_role, nil
+		}
+		return nil, errors.New("stopped")
 	}
 }
 

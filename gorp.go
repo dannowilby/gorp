@@ -53,9 +53,7 @@ func Run(ctx context.Context, state *gorp.State) error {
 	}
 }
 
-func configure_log() {
-	logLevel := flag.String("lvl", "info", "Log level (debug, info, warn, error)")
-	flag.Parse()
+func configure_log(logLevel *string) {
 
 	// Set up the logger with the specified level
 	var level slog.Level
@@ -98,10 +96,20 @@ func load_config(path string) (*Config, error) {
 }
 
 func main() {
-	configure_log()
+	ctx, cancel := context.WithCancel(context.Background())
 
-	local := flag.Bool("local", true, "Run the config locally")
-	config := flag.String("config", "config.local.json", "Load cluster config from a JSON file")
+	logLevel := flag.String("lvl", "info", "Log level (debug, info, warn, error)")
+	id := flag.Int("id", -1, "The instance to run (-1 will start all instances of the config on the same machine)")
+	config := flag.String("config", "", "Load cluster config from a JSON file (empty config will just start a candidate)")
+
+	flag.Parse()
+
+	configure_log(logLevel)
+
+	if *id > -1 && *config == "" {
+		fmt.Println("Config must be set if id is not -1")
+		return
+	}
 
 	var replicas *Config
 
@@ -112,11 +120,11 @@ func main() {
 			return
 		}
 		replicas = loaded
+	} else {
+		replicas = &Config{Replicas: []gorp.State{gorp.EmptyState()}}
 	}
 
-	ctx, cancel := context.WithCancel(context.Background())
-
-	if *local {
+	if *id < 0 {
 		for i := range replicas.Replicas {
 
 			// print the replicas initial state
@@ -127,6 +135,7 @@ func main() {
 
 	} else {
 		// find a way to decide which replica in the config we are running
+		go Run(ctx, &replicas.Replicas[*id])
 	}
 
 	c := make(chan os.Signal, 1)
@@ -139,12 +148,12 @@ func main() {
 	<-c
 	fmt.Println("\n\nExiting...")
 
-	if *local {
+	if *id < 0 {
 		for i := range replicas.Replicas {
 			fmt.Println(&replicas.Replicas[i])
 		}
 	} else {
-		// only print the host replica
+		fmt.Println(&replicas.Replicas[*id])
 	}
 
 }
