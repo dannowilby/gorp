@@ -59,7 +59,15 @@ func (leader *Leader) RequestVote(msg gorp_rpc.RequestVoteMessage, rply *gorp_rp
 }
 
 func (leader *Leader) AppendMessage(msg gorp_rpc.AppendMessage, rply *gorp_rpc.AppendMessageReply) error {
+	// we need to check if the length of the logs is longer and if the term is
+	// the same, if true, then
 	if !gorp_rpc.AppendMessageIsNewer(leader.State, &msg) {
+
+		// the msg sender has a longer log, therefore it should be the leader
+		if gorp_rpc.AppendMessageLogIsLonger(leader.State, &msg) {
+			leader.ChangeSignal <- new(Follower).Init(leader.State)
+		}
+
 		rply.CommitTerm = leader.State.CommitTerm
 		rply.Success = false
 		return nil

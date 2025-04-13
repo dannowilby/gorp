@@ -119,7 +119,7 @@ func (candidate *Candidate) Execute(ctx context.Context) {
 	<-time.After(timeout_duration)
 
 	// if already voted for another machine, don't try gathering votes
-	if candidate.State.VotedFor != "" && candidate.State.VotedFor != candidate.State.Host {
+	if candidate.State.VotedFor != "" {
 		return
 	}
 

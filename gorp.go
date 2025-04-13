@@ -128,13 +128,14 @@ func main() {
 		for i := range replicas.Replicas {
 
 			// print the replicas initial state
-			fmt.Println(&replicas.Replicas[i])
+			fmt.Printf("%#v\n", &replicas.Replicas[i])
 
 			go Run(ctx, &replicas.Replicas[i])
 		}
 
 	} else {
 		// find a way to decide which replica in the config we are running
+		fmt.Printf("%#v\n", &replicas.Replicas[*id])
 		go Run(ctx, &replicas.Replicas[*id])
 	}
 
@@ -150,10 +151,10 @@ func main() {
 
 	if *id < 0 {
 		for i := range replicas.Replicas {
-			fmt.Println(&replicas.Replicas[i])
+			fmt.Printf("%#v\n", &replicas.Replicas[i])
 		}
 	} else {
-		fmt.Println(&replicas.Replicas[*id])
+		fmt.Printf("%#v\n", &replicas.Replicas[*id])
 	}
 
 }

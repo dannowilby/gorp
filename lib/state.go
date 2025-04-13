@@ -36,7 +36,7 @@ type State struct {
 func EmptyState() State {
 	return State{
 		Host:              "localhost:1234",
-		Role:              "candidate",
+		Role:              "follower",
 		ElectionTimeout:   500,
 		RandomizedTimeout: []int{150, 300},
 		Config:            []string{"localhost:1234"},

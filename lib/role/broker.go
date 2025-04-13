@@ -2,6 +2,7 @@ package gorp_role
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
@@ -86,6 +87,12 @@ func (broker *Broker) StartClientServer() {
 	mux.HandleFunc("/demote", func(w http.ResponseWriter, r *http.Request) {
 		broker.Role.GetChangeSignal() <- new(Follower).Init(broker.Role.GetState())
 		w.WriteHeader(200)
+	})
+	mux.HandleFunc("/health-check", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(200)
+		w.Header().Set("Content-Type", "application/json")
+		health := fmt.Sprintf("role: %s, term: %d, commit: %d", broker.Role.GetState().Role, broker.Role.GetState().CommitTerm, broker.Role.GetState().CommitIndex)
+		json.NewEncoder(w).Encode(health)
 	})
 
 	broker.client_server = &http.Server{
