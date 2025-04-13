@@ -2,6 +2,7 @@ package gorp_role
 
 import (
 	"context"
+	"encoding/json"
 	"log/slog"
 	"net/http"
 	"sync"
@@ -46,6 +47,8 @@ func (follower *Follower) AppendMessage(message gorp_rpc.AppendMessage, reply *g
 		reply.Success = false
 		return nil
 	}
+
+	follower.State.Leader = message.LeaderId
 
 	// if this isn't a standard heartbeat, then update log
 	empty_log := gorp.LogEntry{Term: -2}
@@ -100,7 +103,13 @@ func (follower *Follower) RequestVote(msg gorp_rpc.RequestVoteMessage, rply *gor
 }
 
 func (follower *Follower) HandleClient(w http.ResponseWriter, r *http.Request) {
-	w.WriteHeader(200)
+	w.Header().Set("Content-Type", "application/json")
+	response := map[string]interface{}{
+		"status":  "redirect",
+		"target":  gorp.HostToClientHost(follower.State.Leader),
+		"message": "Please resend your request to the target URL",
+	}
+	json.NewEncoder(w).Encode(response)
 }
 
 // Checks on the heartbeat and turns into a candidate if no pulse

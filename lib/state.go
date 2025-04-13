@@ -1,11 +1,18 @@
 package gorp
 
+import (
+	"strconv"
+	"strings"
+)
+
 type LogEntry struct {
 	Term    int    `json:"term"`
 	Message string `json:"message"`
 }
 
 type State struct {
+	// used to redirect clients to the appropriate leader
+	Leader string `json:"leader"`
 
 	// the running replica's host/port
 	Host string `json:"host"`
@@ -50,4 +57,13 @@ func EmptyState() State {
 // machine from the majority. AKA the number of separate machines needed for a majority.
 func NumMajority(state *State) int {
 	return ((len(state.Config) + 1) / 2) - 1
+}
+
+func HostToClientHost(host string) string {
+	segments := strings.Split(host, ":")
+	port, err := strconv.Atoi(segments[1])
+	if err != nil {
+		return ""
+	}
+	return "http://" + segments[0] + ":" + strconv.Itoa(port+3000)
 }
