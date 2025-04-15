@@ -138,7 +138,7 @@ func (candidate *Candidate) Execute(ctx context.Context) {
 	// vote counting mechanism
 	votes := make(chan bool)
 
-	votes_needed := gorp.NumMajority(candidate.State)
+	votes_threshold := gorp.NumMajority(candidate.State)
 	vote_tally := 1
 	votes_received := 0
 
@@ -172,17 +172,17 @@ func (candidate *Candidate) Execute(ctx context.Context) {
 				vote_tally += 1
 			}
 
-			completed = vote_tally >= votes_needed
+			completed = vote_tally >= votes_threshold
 		}
 	}
 
-	slog.Debug("vote counts", "votes tally", vote_tally, "votes received", votes_received, "votes needed", votes_needed)
+	slog.Debug("vote counts", "votes tally", vote_tally, "votes received", votes_received, "votes threshold", votes_threshold)
 
 	cancel()
 
 	// if a majority accept, then transition to a leader and sends heartbeats to
 	// enforce its authority
-	if vote_tally >= votes_needed {
+	if vote_tally > votes_threshold {
 		candidate.ChangeSignal <- new(Leader).Init(candidate.State)
 		return
 	}
