@@ -27,6 +27,7 @@ func (leader *Leader) append_to_machine(host string, success chan bool) {
 
 		// something has gone wrong, maybe the machine is unreachable
 		if msg_to_send == -1 {
+			leader.nextIndex[host] = 0
 			success <- false
 			return
 		}
