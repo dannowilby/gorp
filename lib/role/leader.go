@@ -85,18 +85,15 @@ func (leader *Leader) AppendMessage(msg gorp_rpc.AppendMessage, rply *gorp_rpc.A
 	return nil
 }
 
-type ClientMessage struct {
-	Message string `json:"message"`
-}
-
 func (leader *Leader) HandleClient(w http.ResponseWriter, r *http.Request) {
-	var client_message ClientMessage
-	err := json.NewDecoder(r.Body).Decode(&client_message)
+	var message gorp.LogEntry
+	err := json.NewDecoder(r.Body).Decode(&message)
 	if err != nil {
 		w.WriteHeader(400)
 	}
+	message.Term = leader.State.CommitTerm
 
-	leader.msgs <- gorp.LogEntry{Term: leader.State.CommitTerm, Message: client_message.Message}
+	leader.msgs <- message
 	w.WriteHeader(200)
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode("Message queued to be saved.")

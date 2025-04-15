@@ -1,13 +1,18 @@
 package gorp
 
 import (
+	"encoding/json"
 	"strconv"
 	"strings"
 )
 
 type LogEntry struct {
-	Term    int    `json:"term"`
-	Message string `json:"message"`
+	Term int `json:"term"`
+
+	// Type specifies what type of message this should be interpreted as. This
+	// may be a config change, update to storage, or potential snapshot data
+	Type    string          `json:"type"`
+	Message json.RawMessage `json:"message"`
 }
 
 type State struct {
