@@ -105,8 +105,11 @@ func (leader *Leader) Replicate(parent_ctx context.Context, msg gorp.LogEntry) {
 
 			if vote_count >= majority {
 
-				// commit the log and apply
+				// commit the log
 				leader.State.CommitIndex += 1
+
+				// apply the log
+				Apply(leader)
 
 				// stop all the machines from trying to update,
 				// if a machine is unable to be updated in the allotted time

@@ -65,8 +65,7 @@ func (follower *Follower) AppendMessage(message gorp_rpc.AppendMessage, reply *g
 		// we update our commit index
 		follower.State.CommitIndex = min(message.LeaderCommit, len(follower.State.Log)-1)
 
-		// since we know that they are now committed, apply them
-		follower.State.LastApplied = follower.State.CommitIndex
+		Apply(follower)
 	}
 
 	follower.State.CommitTerm = message.Term
