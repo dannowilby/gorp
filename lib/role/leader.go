@@ -108,7 +108,7 @@ func (leader *Leader) Execute(ctx context.Context) {
 		select {
 		// when we have a message that needs replicating
 		case msg := <-leader.msgs:
-			leader.replicate(ctx, msg)
+			leader.Replicate(ctx, msg)
 		case <-ctx.Done():
 			return
 		}

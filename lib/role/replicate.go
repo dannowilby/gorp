@@ -10,7 +10,7 @@ import (
 )
 
 // Updates the machine and tries to append
-func (leader *Leader) append_to_machine(host string, success chan bool) {
+func (leader *Leader) updateMachine(host string, success chan bool) {
 
 	client, err := rpc.DialHTTPPath("tcp", host, "/")
 
@@ -75,7 +75,7 @@ func (leader *Leader) append_to_machine(host string, success chan bool) {
 // normally functioning appends when a majority is achieved. This needs further
 // testing, but it should still offer certainty that a majority has replicated
 // any one log message.
-func (leader *Leader) replicate(parent_ctx context.Context, msg gorp.LogEntry) {
+func (leader *Leader) Replicate(parent_ctx context.Context, msg gorp.LogEntry) {
 
 	ctx, cancel := context.WithCancel(parent_ctx)
 
@@ -89,7 +89,7 @@ func (leader *Leader) replicate(parent_ctx context.Context, msg gorp.LogEntry) {
 		}
 
 		// send message to machines, get response through accepted channel
-		go leader.append_to_machine(host, accepted)
+		go leader.updateMachine(host, accepted)
 	}
 
 	majority := gorp.NumMajority(leader.State)
