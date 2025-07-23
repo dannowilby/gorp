@@ -79,6 +79,10 @@ func (leader *Leader) Replicate(parent_ctx context.Context, msg gorp.LogEntry) {
 
 	ctx, cancel := context.WithCancel(parent_ctx)
 
+	// if its the first config change, update the log with an augmented config
+	// change the leader's config to this new config (then we want to append it
+	// and replicate it)
+
 	leader.State.Log = append(leader.State.Log, msg)
 
 	// query machines
