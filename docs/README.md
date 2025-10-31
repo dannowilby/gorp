@@ -21,6 +21,13 @@ A distributed photo storage implemented with Raft [1].
 - [ ] **Log compaction** - snapshots of the machine's log need to be stored on
   disk to save space and allow better recoverability/resiliency from crashes
 
+## Design considerations
+
+Embarrasingly a Kubernetes resource was designed at first. After more research,
+this was determined to be a ouroboros-like idea. Kubernetes uses etcd to ensure
+consistency between nodes/pods in a cluster. etcd is literally an implementation
+of Raft, so relying on it does not make the most amount of sense.
+
 ## References
 
 [1] [In Search of an Understandable Consensus Algorithm (Extended Version)](https://raft.github.io/raft.pdf), Diego Ongaro and John Ousterhout

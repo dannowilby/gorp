@@ -1,5 +1,7 @@
 package gorp_role
 
+import "fmt"
+
 // Applies the log entries up to the commit index, updating the `LastApplied` to
 // reflect this.
 func Apply(role Role) {
@@ -11,10 +13,12 @@ func Apply(role Role) {
 		entry := log[last_applied+1]
 
 		if entry.Type == "data" {
-			// fmt.Println("applying:", last_applied+1)
+			fmt.Println("applying:", last_applied+1)
 		}
 		if entry.Type == "config" {
-			// fmt.Println("updating config")
+			fmt.Println("updating config")
+
+			// requeue a c_new message if this machine is the leader
 		}
 
 		last_applied++

@@ -2,6 +2,7 @@ package gorp
 
 import (
 	"encoding/json"
+	"fmt"
 	"strconv"
 	"strings"
 )
@@ -45,6 +46,12 @@ type State struct {
 	RandomizedTimeout []int `json:"randomizedTimeout"`
 }
 
+// RoleTransition represents a request to transition to a new role
+type RoleTransition struct {
+	RoleName string // "leader", "candidate", "follower", or "" for shutdown
+	State    *State
+}
+
 func EmptyState() State {
 	return State{
 		Host:              "localhost:1234",
@@ -71,4 +78,34 @@ func HostToClientHost(host string) string {
 		return ""
 	}
 	return "http://" + segments[0] + ":" + strconv.Itoa(port+3000)
+}
+
+// Applicable defines the interface needed for applying log entries
+type Applicable interface {
+	GetState() *State
+}
+
+// Apply applies the log entries up to the commit index, updating the LastApplied
+func Apply(role Applicable) {
+	state := role.GetState()
+	log := state.Log
+	up_to := state.CommitIndex
+	last_applied := state.LastApplied
+
+	for last_applied != up_to {
+		entry := log[last_applied+1]
+
+		if entry.Type == "data" {
+			fmt.Println("applying:", last_applied+1)
+		}
+		if entry.Type == "config" {
+			fmt.Println("updating config")
+			// requeue c_new if this is the leader
+		}
+
+		fmt.Println(entry.Message)
+
+		last_applied++
+		state.LastApplied = last_applied
+	}
 }

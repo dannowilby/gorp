@@ -11,13 +11,14 @@ import (
 	"strings"
 
 	gorp "github.com/dannowilby/gorp/lib"
+	"github.com/dannowilby/gorp/lib/role/candidate"
+	"github.com/dannowilby/gorp/lib/role/follower"
+	"github.com/dannowilby/gorp/lib/role/leader"
 	gorp_rpc "github.com/dannowilby/gorp/lib/rpc"
 	"github.com/gorilla/mux"
 )
 
 type Role interface {
-	Init(*gorp.State) Role
-
 	// RPC methods
 	RequestVote(gorp_rpc.RequestVoteMessage, *gorp_rpc.RequestVoteReply) error
 	AppendMessage(gorp_rpc.AppendMessage, *gorp_rpc.AppendMessageReply) error
@@ -28,7 +29,7 @@ type Role interface {
 
 	HandleClient(w http.ResponseWriter, r *http.Request)
 
-	GetChangeSignal() chan Role
+	GetChangeSignal() chan *gorp.RoleTransition
 
 	// Used as a type check to ensure that the role has a relation
 	// to the underlying state object of the replica
@@ -85,7 +86,7 @@ func (broker *Broker) StartClientServer() {
 		w.WriteHeader(200)
 	})
 	mux.HandleFunc("/demote", func(w http.ResponseWriter, r *http.Request) {
-		broker.Role.GetChangeSignal() <- new(Follower).Init(broker.Role.GetState())
+		broker.Role.GetChangeSignal() <- &gorp.RoleTransition{RoleName: "follower", State: broker.Role.GetState()}
 		w.WriteHeader(200)
 	})
 	mux.HandleFunc("/health-check", func(w http.ResponseWriter, r *http.Request) {
@@ -123,11 +124,29 @@ func (broker *Broker) NextRole(ctx context.Context) (Role, error) {
 	select {
 	case <-ctx.Done():
 		return nil, errors.New("cancelled")
-	case next_role := <-broker.Role.GetChangeSignal():
-		if next_role != nil {
-			return next_role, nil
+	case transition := <-broker.Role.GetChangeSignal():
+		if transition == nil || transition.RoleName == "" {
+			return nil, errors.New("stopped")
 		}
-		return nil, errors.New("stopped")
+
+		var role Role
+		switch strings.ToLower(transition.RoleName) {
+		case "leader":
+			l := &leader.Leader{}
+			l.Init(transition.State)
+			role = l
+		case "candidate":
+			c := &candidate.Candidate{}
+			c.Init(transition.State)
+			role = c
+		case "follower":
+			f := &follower.Follower{}
+			f.Init(transition.State)
+			role = f
+		default:
+			return nil, errors.New("unknown role: " + transition.RoleName)
+		}
+		return role, nil
 	}
 }
 
@@ -141,12 +160,31 @@ func FromState(state *gorp.State) Broker {
 	var role Role
 	switch strings.ToLower(state.Role) {
 	case "leader":
-		role = new(Leader).Init(state)
+		l := &leader.Leader{}
+		l.Init(state)
+		role = l
 	case "candidate":
-		role = new(Candidate).Init(state)
+		c := &candidate.Candidate{}
+		c.Init(state)
+		role = c
 	default:
-		role = new(Follower).Init(state)
+		f := &follower.Follower{}
+		f.Init(state)
+		role = f
 	}
 
 	return Broker{Role: role}
+}
+
+// Factory functions to create new role instances
+func NewLeader() *leader.Leader {
+	return &leader.Leader{}
+}
+
+func NewCandidate() *candidate.Candidate {
+	return &candidate.Candidate{}
+}
+
+func NewFollower() *follower.Follower {
+	return &follower.Follower{}
 }
