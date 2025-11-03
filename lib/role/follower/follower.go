@@ -3,6 +3,7 @@ package follower
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"sync"
@@ -65,7 +66,7 @@ func (follower *Follower) AppendMessage(message gorp_rpc.AppendMessage, reply *g
 		// we update our commit index
 		follower.State.CommitIndex = min(message.LeaderCommit, len(follower.State.Log)-1)
 
-		gorp.Apply(follower)
+		follower.Apply()
 	}
 
 	follower.State.CommitTerm = message.Term
@@ -153,4 +154,36 @@ func (follower *Follower) GetChangeSignal() chan *gorp.RoleTransition {
 
 func (follower *Follower) GetState() *gorp.State {
 	return follower.State
+}
+
+func (follower *Follower) Apply() {
+	log := follower.State.Log
+	up_to := follower.State.CommitIndex
+	last_applied := follower.State.LastApplied
+
+	for last_applied != up_to {
+		entry := log[last_applied+1]
+
+		if entry.Type == "data" {
+			fmt.Println("applying:", last_applied+1)
+		}
+		if entry.Type == "config" {
+			fmt.Println("Updating config.")
+
+			var config gorp.ConfigData
+
+			// should not error due to previous error checking
+			err := json.Unmarshal(entry.Message, &config)
+
+			if err != nil {
+				fmt.Println(err)
+			}
+
+			// update the config
+			follower.State.Config = append(config.New, config.Old...)
+		}
+
+		last_applied++
+		follower.State.LastApplied = last_applied
+	}
 }

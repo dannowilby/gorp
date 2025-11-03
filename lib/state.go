@@ -2,7 +2,6 @@ package gorp
 
 import (
 	"encoding/json"
-	"fmt"
 	"strconv"
 	"strings"
 )
@@ -14,6 +13,11 @@ type LogEntry struct {
 	// may be a config change, update to storage, or potential snapshot data
 	Type    string          `json:"type"`
 	Message json.RawMessage `json:"message"`
+}
+
+type ConfigData struct {
+	Old []string `json:"old"`
+	New []string `json:"new"`
 }
 
 type State struct {
@@ -78,34 +82,4 @@ func HostToClientHost(host string) string {
 		return ""
 	}
 	return "http://" + segments[0] + ":" + strconv.Itoa(port+3000)
-}
-
-// Applicable defines the interface needed for applying log entries
-type Applicable interface {
-	GetState() *State
-}
-
-// Apply applies the log entries up to the commit index, updating the LastApplied
-func Apply(role Applicable) {
-	state := role.GetState()
-	log := state.Log
-	up_to := state.CommitIndex
-	last_applied := state.LastApplied
-
-	for last_applied != up_to {
-		entry := log[last_applied+1]
-
-		if entry.Type == "data" {
-			fmt.Println("applying:", last_applied+1)
-		}
-		if entry.Type == "config" {
-			fmt.Println("updating config")
-			// requeue c_new if this is the leader
-		}
-
-		fmt.Println(entry.Message)
-
-		last_applied++
-		state.LastApplied = last_applied
-	}
 }

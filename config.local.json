@@ -29,6 +29,16 @@
             "randomizedTimeout": [150, 300],
             "config": [ "localhost:1234", "localhost:1235", "localhost:1236" ],
             "role": "follower"
+        },
+        {
+            "host": "localhost:1237",
+            "commitTerm": 0,
+            "commitIndex": -1,
+            "lastApplied": -1,
+            "electionTimeout": 500,
+            "randomizedTimeout": [150, 300],
+            "config": [ "localhost:1237" ],
+            "role": "follower"
         }
     ]
 }

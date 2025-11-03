@@ -15,7 +15,7 @@ A distributed photo storage implemented with Raft [1].
   timely way. This is done through an election.
 - [x] **Log replication** - the follower logs needs to heal themselves to be
   up-to-date from the leader's logs. This is done through an inductive process.
-- [ ] **Config changes** - special messages can be passed that define updated
+- [x] **Config changes** - special messages can be passed that define updated
   network configurations. The new set of hosts in the configuration will be
   transitioned to while perserving the protocol invariants.
 - [ ] **Log compaction** - snapshots of the machine's log need to be stored on

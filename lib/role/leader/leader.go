@@ -14,7 +14,7 @@ type Leader struct {
 	State *gorp.State
 
 	// essentially a queue of messages that we have to try and append
-	msgs chan gorp.LogEntry
+	MessageQueue chan gorp.LogEntry
 
 	// the next log index to send to the associated server
 	nextIndex map[string]int
@@ -29,7 +29,7 @@ func (leader *Leader) Init(state *gorp.State) *Leader {
 	leader.State = state
 	leader.State.Role = "leader"
 
-	leader.msgs = make(chan gorp.LogEntry, 10)
+	leader.MessageQueue = make(chan gorp.LogEntry, 10)
 	leader.ChangeSignal = make(chan *gorp.RoleTransition, 1)
 
 	leader.nextIndex = make(map[string]int)
@@ -93,12 +93,26 @@ func (leader *Leader) HandleClient(w http.ResponseWriter, r *http.Request) {
 	}
 	message.Term = leader.State.CommitTerm
 
-	// preprocess config changes so that c_old_new is commited.
+	// if this is a config change,
+	// preprocess so that c_old_new is commited.
 	if message.Type == "config" {
-		fmt.Println("new config being configured")
+
+		var config gorp.ConfigData
+
+		err := json.Unmarshal(message.Message, &config)
+
+		if err != nil {
+			w.WriteHeader(200)
+			w.Header().Set("Content-Type", "application/json")
+			json.NewEncoder(w).Encode("Invalid configuration format.")
+			return
+		}
+
+		config.Old = leader.State.Config
+		fmt.Println(message)
 	}
 
-	leader.msgs <- message
+	leader.MessageQueue <- message
 	w.WriteHeader(200)
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode("Message queued to be saved.")
@@ -112,7 +126,7 @@ func (leader *Leader) Execute(ctx context.Context) {
 	for {
 		select {
 		// when we have a message that needs replicating
-		case msg := <-leader.msgs:
+		case msg := <-leader.MessageQueue:
 			leader.Replicate(ctx, msg)
 		case <-ctx.Done():
 			return

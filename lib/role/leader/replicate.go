@@ -2,6 +2,7 @@ package leader
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net/rpc"
 
@@ -79,10 +80,6 @@ func (leader *Leader) Replicate(parent_ctx context.Context, msg gorp.LogEntry) {
 
 	ctx, cancel := context.WithCancel(parent_ctx)
 
-	// if its the first config change, update the log with an augmented config
-	// change the leader's config to this new config (then we want to append it
-	// and replicate it)
-
 	leader.State.Log = append(leader.State.Log, msg)
 
 	// query machines
@@ -113,7 +110,7 @@ func (leader *Leader) Replicate(parent_ctx context.Context, msg gorp.LogEntry) {
 				leader.State.CommitIndex += 1
 
 				// apply the log
-				gorp.Apply(leader)
+				leader.Apply()
 
 				// stop all the machines from trying to update,
 				// if a machine is unable to be updated in the allotted time
@@ -130,4 +127,49 @@ func (leader *Leader) Replicate(parent_ctx context.Context, msg gorp.LogEntry) {
 		}
 	}
 
+}
+
+func (leader *Leader) Apply() {
+	log := leader.State.Log
+	up_to := leader.State.CommitIndex
+	last_applied := leader.State.LastApplied
+
+	for last_applied != up_to {
+		entry := log[last_applied+1]
+
+		if entry.Type == "data" {
+			fmt.Println("applying:", last_applied+1)
+		}
+		if entry.Type == "config" {
+			fmt.Println("Updating config.")
+
+			var config gorp.ConfigData
+
+			// should not error due to previous error checking
+			err := json.Unmarshal(entry.Message, &config)
+
+			if err != nil {
+				fmt.Println(err)
+			}
+
+			if len(config.Old) > 0 {
+
+				// build the new data
+				data, _ := json.Marshal(gorp.ConfigData{New: config.New})
+
+				// requeue the new data
+				leader.MessageQueue <- gorp.LogEntry{
+					Term:    leader.State.CommitTerm,
+					Type:    "config",
+					Message: data,
+				}
+			}
+
+			// update the config
+			leader.State.Config = append(config.New, config.Old...)
+		}
+
+		last_applied++
+		leader.State.LastApplied = last_applied
+	}
 }
