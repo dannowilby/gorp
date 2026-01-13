@@ -12,7 +12,6 @@ import (
 	"syscall"
 
 	gorp "github.com/dannowilby/gorp/lib"
-	gorp_role "github.com/dannowilby/gorp/lib/role"
 )
 
 type Config struct {
@@ -21,7 +20,7 @@ type Config struct {
 
 func Run(ctx context.Context, state *gorp.State) error {
 
-	var replica gorp_role.Broker = gorp_role.FromState(state)
+	var replica gorp.Broker = gorp.FromState(state)
 
 	for {
 
