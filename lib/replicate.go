@@ -135,7 +135,8 @@ func (leader *Leader) Apply() {
 		entry := log[last_applied+1]
 
 		if entry.Type == "data" {
-			fmt.Println("applying:", last_applied+1)
+			fmt.Println("Applying:", last_applied+1)
+			ApplyData(entry)
 		}
 		if entry.Type == "config" {
 			fmt.Println("Updating config.")
@@ -169,4 +170,14 @@ func (leader *Leader) Apply() {
 		last_applied++
 		leader.State.LastApplied = last_applied
 	}
+}
+
+func ApplyData(entry LogEntry) {
+	var message MessageData
+	err := json.Unmarshal(entry.Message, &message)
+	if err != nil {
+		fmt.Println(err)
+	}
+	fmt.Println("Path:", message.Path)
+	fmt.Println("Blob:", message.Blob)
 }

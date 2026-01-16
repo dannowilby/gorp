@@ -15,6 +15,11 @@ type LogEntry struct {
 	Message json.RawMessage `json:"message"`
 }
 
+type MessageData struct {
+	Path string `json:"path"`
+	Blob string `json:"blob"`
+}
+
 type ConfigData struct {
 	Old []string `json:"old"`
 	New []string `json:"new"`
