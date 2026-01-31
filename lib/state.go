@@ -16,8 +16,9 @@ type LogEntry struct {
 }
 
 type MessageData struct {
-	Path string `json:"path"`
-	Blob string `json:"blob"`
+	Path      string `json:"path"`
+	Blob      string `json:"blob"`
+	Operation string `json:"operation"` // "write", "delete", "update"
 }
 
 type ConfigData struct {

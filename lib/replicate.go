@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/rpc"
+	"os"
+	"path/filepath"
 )
 
 // Updates the machine and tries to append
@@ -172,12 +174,56 @@ func (leader *Leader) Apply() {
 	}
 }
 
-func ApplyData(entry LogEntry) {
+const dataDir = "data"
+
+func ApplyData(entry LogEntry) error {
+
+	fmt.Println("Applying data entry")
 	var message MessageData
 	err := json.Unmarshal(entry.Message, &message)
 	if err != nil {
-		fmt.Println(err)
+		return fmt.Errorf("failed to unmarshal message: %w", err)
 	}
-	fmt.Println("Path:", message.Path)
-	fmt.Println("Blob:", message.Blob)
+
+	fullPath := filepath.Join(dataDir, message.Path)
+
+	// Ensure the data directory exists
+	if err := os.MkdirAll(filepath.Dir(fullPath), 0755); err != nil {
+		return fmt.Errorf("failed to create directory: %w", err)
+	}
+
+	switch message.Operation {
+	case "write":
+		fmt.Println("writing")
+		// Create or overwrite a file
+		if err := os.WriteFile(fullPath, []byte(message.Blob), 0644); err != nil {
+			return fmt.Errorf("failed to write file: %w", err)
+		}
+		fmt.Println("Wrote file:", fullPath)
+
+	case "update":
+		// Only update if the file already exists
+		if _, err := os.Stat(fullPath); os.IsNotExist(err) {
+			return fmt.Errorf("file does not exist, cannot update: %s", fullPath)
+		}
+		if err := os.WriteFile(fullPath, []byte(message.Blob), 0644); err != nil {
+			return fmt.Errorf("failed to update file: %w", err)
+		}
+		fmt.Println("Updated file:", fullPath)
+
+	case "delete":
+		// Remove the file if it exists
+		if err := os.Remove(fullPath); err != nil {
+			if os.IsNotExist(err) {
+				return fmt.Errorf("file does not exist, cannot delete: %s", fullPath)
+			}
+			return fmt.Errorf("failed to delete file: %w", err)
+		}
+		fmt.Println("Deleted file:", fullPath)
+
+	default:
+		return fmt.Errorf("unknown operation: %s", message.Operation)
+	}
+
+	return nil
 }

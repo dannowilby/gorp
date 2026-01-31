@@ -4,8 +4,13 @@
 
 A distributed photo storage implemented with Raft [1].
 
-## Implemented features
+## Quick start
+To run a quick cluster with 3 instances, run the following command. Make sure
+your `config.local.json` is correct.
 
+`go run . -id=<i> -config=config.local.json`
+
+## Implemented features
 - [x] **Message appending** - follower replicas need to be able to add new
   messages to the end of their log when the appropriate conditions are met
   (message term is valid, log is up-to-date, the previous message of both
@@ -22,7 +27,6 @@ A distributed photo storage implemented with Raft [1].
   disk to save space and allow better recoverability/resiliency from crashes
 
 ## Design considerations
-
 Embarrasingly a Kubernetes resource was designed at first. After more research,
 this was determined to be a ouroboros-like idea. Kubernetes uses etcd to ensure
 consistency between nodes/pods in a cluster. etcd is literally an implementation
