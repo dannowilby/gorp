@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"os"
+	"path/filepath"
 )
 
 type Leader struct {
@@ -83,35 +85,58 @@ func (leader *Leader) AppendMessage(msg AppendMessage, rply *AppendMessageReply)
 }
 
 func (leader *Leader) HandleClient(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	// Handle GET requests directly - no need to go through Raft consensus
+	if r.Method == http.MethodGet {
+		path := r.URL.Query().Get("path")
+		if path == "" {
+			w.WriteHeader(400)
+			json.NewEncoder(w).Encode("Missing 'path' query parameter.")
+			return
+		}
+
+		data, err := os.ReadFile(filepath.Join("data", path))
+		if err != nil {
+			if os.IsNotExist(err) {
+				w.WriteHeader(404)
+				json.NewEncoder(w).Encode("File not found.")
+			} else {
+				w.WriteHeader(500)
+				json.NewEncoder(w).Encode("Error reading file.")
+			}
+			return
+		}
+
+		w.WriteHeader(200)
+		json.NewEncoder(w).Encode(string(data))
+		return
+	}
+
+	// Everything else goes through Raft
 	var message LogEntry
 	err := json.NewDecoder(r.Body).Decode(&message)
 	if err != nil {
 		w.WriteHeader(400)
+		json.NewEncoder(w).Encode("Invalid request body.")
+		return
 	}
 	message.Term = leader.State.CommitTerm
 
-	// if this is a config change,
-	// preprocess so that c_old_new is commited.
 	if message.Type == "config" {
-
 		var config ConfigData
-
 		err := json.Unmarshal(message.Message, &config)
-
 		if err != nil {
-			w.WriteHeader(200)
-			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(400)
 			json.NewEncoder(w).Encode("Invalid configuration format.")
 			return
 		}
-
 		config.Old = leader.State.Config
 		fmt.Println(message)
 	}
 
 	leader.MessageQueue <- message
 	w.WriteHeader(200)
-	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode("Message queued to be saved.")
 }
 
