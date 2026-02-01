@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"time"
 )
 
 type Leader struct {
@@ -84,36 +85,155 @@ func (leader *Leader) AppendMessage(msg AppendMessage, rply *AppendMessageReply)
 	return nil
 }
 
+func (leader *Leader) GetStatus(hash string) StatusResponse {
+	electionTimeout := time.Duration(leader.State.ElectionTimeout) * time.Millisecond
+
+	// Walk the committed portion of the log looking for the hash
+	for i := 0; i <= leader.State.CommitIndex; i++ {
+		if leader.State.Log[i].Hash == hash {
+			return StatusResponse{
+				Status: "success",
+				Hash:   hash,
+			}
+		}
+	}
+
+	// Not committed yet, check if it's in the uncommitted portion
+	for i := leader.State.CommitIndex + 1; i < len(leader.State.Log); i++ {
+		entry := leader.State.Log[i]
+		if entry.Hash == hash {
+			// Found but not committed, check if we're still within the timeout
+			if time.Since(entry.Timestamp) < electionTimeout {
+				return StatusResponse{
+					Status: "pending",
+					Hash:   hash,
+				}
+			}
+
+			// Past the election timeout and still not committed
+			return StatusResponse{
+				Status: "failed",
+				Hash:   hash,
+			}
+		}
+	}
+
+	// Hash not found anywhere in the log
+	return StatusResponse{
+		Status: "failed",
+		Hash:   hash,
+	}
+}
+
+// HandleClient routes incoming client requests to the appropriate handler.
+//
+// Endpoints:
+//
+//	POST /client
+//	  Submit a new log entry (write, update, delete) to the cluster.
+//	  Request body:
+//	    {
+//	      "type": "data",
+//	      "message": {
+//	        "path": "documents/hello.txt",
+//	        "blob": "hello world",
+//	        "operation": "write"
+//	      }
+//	    }
+//	  Response (200):
+//	    {
+//	      "hash": "abc123...",
+//	      "timestamp": "2024-01-01T00:00:00.000000000Z"
+//	    }
+//
+//	  Examples:
+//
+//	    Write a file:
+//	      curl -X POST http://localhost:8080/client \
+//	        -H "Content-Type: application/json" \
+//	        -d '{"type":"data","message":{"path":"docs/hello.txt","blob":"hello world","operation":"write"}}'
+//
+//	    Update a file:
+//	      curl -X POST http://localhost:8080/client \
+//	        -H "Content-Type: application/json" \
+//	        -d '{"type":"data","message":{"path":"docs/hello.txt","blob":"updated content","operation":"update"}}'
+//
+//	    Delete a file:
+//	      curl -X POST http://localhost:8080/client \
+//	        -H "Content-Type: application/json" \
+//	        -d '{"type":"data","message":{"path":"docs/hello.txt","blob":"","operation":"delete"}}'
+//
+//	GET /status?hash=<hash>
+//	  Poll for the status of a previously submitted log entry.
+//	  Response (200):
+//	    { "status": "success", "hash": "abc123..." }
+//	    { "status": "pending", "hash": "abc123..." }
+//	    { "status": "failed",  "hash": "abc123..." }
+//
+//	  Example:
+//	    curl "http://localhost:8080/status?hash=abc123..."
+//
+//	GET /file?path=<path>
+//	  Read a file from the committed state machine.
+//	  Response (200): "file contents here"
+//	  Response (404): "File not found."
+//
+//	  Example:
+//	    curl "http://localhost:8080/file?path=docs/hello.txt"
 func (leader *Leader) HandleClient(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
-	// Handle GET requests directly - no need to go through Raft consensus
-	if r.Method == http.MethodGet {
-		path := r.URL.Query().Get("path")
-		if path == "" {
-			w.WriteHeader(400)
-			json.NewEncoder(w).Encode("Missing 'path' query parameter.")
-			return
-		}
+	switch {
+	case r.Method == http.MethodGet && r.URL.Path == "/status":
+		leader.handleStatus(w, r)
+	case r.Method == http.MethodGet && r.URL.Path == "/file":
+		leader.handleFileRead(w, r)
+	case r.Method == http.MethodPost && r.URL.Path == "/client":
+		leader.handleSubmit(w, r)
+	default:
+		w.WriteHeader(404)
+		json.NewEncoder(w).Encode("Not found.")
+	}
+}
 
-		data, err := os.ReadFile(filepath.Join("data", path))
-		if err != nil {
-			if os.IsNotExist(err) {
-				w.WriteHeader(404)
-				json.NewEncoder(w).Encode("File not found.")
-			} else {
-				w.WriteHeader(500)
-				json.NewEncoder(w).Encode("Error reading file.")
-			}
-			return
-		}
-
-		w.WriteHeader(200)
-		json.NewEncoder(w).Encode(string(data))
+func (leader *Leader) handleFileRead(w http.ResponseWriter, r *http.Request) {
+	path := r.URL.Query().Get("path")
+	if path == "" {
+		w.WriteHeader(400)
+		json.NewEncoder(w).Encode("Missing 'path' query parameter.")
 		return
 	}
 
-	// Everything else goes through Raft
+	data, err := os.ReadFile(filepath.Join("data", path))
+	if err != nil {
+		if os.IsNotExist(err) {
+			w.WriteHeader(404)
+			json.NewEncoder(w).Encode("File not found.")
+		} else {
+			w.WriteHeader(500)
+			json.NewEncoder(w).Encode("Error reading file.")
+		}
+		return
+	}
+
+	w.WriteHeader(200)
+	json.NewEncoder(w).Encode(string(data))
+}
+
+func (leader *Leader) handleStatus(w http.ResponseWriter, r *http.Request) {
+	hash := r.URL.Query().Get("hash")
+	if hash == "" {
+		w.WriteHeader(400)
+		json.NewEncoder(w).Encode("Missing 'hash' query parameter.")
+		return
+	}
+
+	status := leader.GetStatus(hash)
+	w.WriteHeader(200)
+	json.NewEncoder(w).Encode(status)
+}
+
+func (leader *Leader) handleSubmit(w http.ResponseWriter, r *http.Request) {
 	var message LogEntry
 	err := json.NewDecoder(r.Body).Decode(&message)
 	if err != nil {
@@ -122,6 +242,15 @@ func (leader *Leader) HandleClient(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	message.Term = leader.State.CommitTerm
+	message.Timestamp = time.Now()
+
+	hash, err := GenerateHash(message.Message)
+	if err != nil {
+		w.WriteHeader(500)
+		json.NewEncoder(w).Encode("Failed to generate message hash.")
+		return
+	}
+	message.Hash = hash
 
 	if message.Type == "config" {
 		var config ConfigData
@@ -132,12 +261,15 @@ func (leader *Leader) HandleClient(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		config.Old = leader.State.Config
-		fmt.Println(message)
 	}
 
 	leader.MessageQueue <- message
+
 	w.WriteHeader(200)
-	json.NewEncoder(w).Encode("Message queued to be saved.")
+	json.NewEncoder(w).Encode(SubmitResponse{
+		Hash:      hash,
+		Timestamp: message.Timestamp.Format(time.RFC3339Nano),
+	})
 }
 
 func (leader *Leader) Execute(ctx context.Context) {

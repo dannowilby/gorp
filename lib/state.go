@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"strconv"
 	"strings"
+	"time"
 )
 
 type LogEntry struct {
@@ -13,12 +14,29 @@ type LogEntry struct {
 	// may be a config change, update to storage, or potential snapshot data
 	Type    string          `json:"type"`
 	Message json.RawMessage `json:"message"`
+
+	// Hash is generated from the message content and used to track
+	// the status of the entry. Persisted so a new leader can recover this.
+	Hash      string    `json:"hash"`
+	Timestamp time.Time `json:"timestamp"`
 }
 
 type MessageData struct {
 	Path      string `json:"path"`
 	Blob      string `json:"blob"`
 	Operation string `json:"operation"` // "write", "delete", "update"
+}
+
+// Response sent back to the client when they first submit a message
+type SubmitResponse struct {
+	Hash      string `json:"hash"`
+	Timestamp string `json:"timestamp"`
+}
+
+// Response sent back when a client polls for status
+type StatusResponse struct {
+	Status string `json:"status"` // "success", "pending", "failed"
+	Hash   string `json:"hash"`
 }
 
 type ConfigData struct {
