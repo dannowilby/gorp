@@ -129,7 +129,7 @@ func (leader *Leader) GetStatus(hash string) StatusResponse {
 //
 // Endpoints:
 //
-//	POST /client
+//	POST /api
 //	  Submit a new log entry (write, update, delete) to the cluster.
 //	  Request body:
 //	    {
@@ -149,17 +149,17 @@ func (leader *Leader) GetStatus(hash string) StatusResponse {
 //	  Examples:
 //
 //	    Write a file:
-//	      curl -X POST http://localhost:8080/client \
+//	      curl -X POST http://localhost:8080/api \
 //	        -H "Content-Type: application/json" \
 //	        -d '{"type":"data","message":{"path":"docs/hello.txt","blob":"hello world","operation":"write"}}'
 //
 //	    Update a file:
-//	      curl -X POST http://localhost:8080/client \
+//	      curl -X POST http://localhost:8080/api \
 //	        -H "Content-Type: application/json" \
 //	        -d '{"type":"data","message":{"path":"docs/hello.txt","blob":"updated content","operation":"update"}}'
 //
 //	    Delete a file:
-//	      curl -X POST http://localhost:8080/client \
+//	      curl -X POST http://localhost:8080/api \
 //	        -H "Content-Type: application/json" \
 //	        -d '{"type":"data","message":{"path":"docs/hello.txt","blob":"","operation":"delete"}}'
 //
@@ -180,6 +180,11 @@ func (leader *Leader) GetStatus(hash string) StatusResponse {
 //
 //	  Example:
 //	    curl "http://localhost:8080/file?path=docs/hello.txt"
+//
+//	GET /files
+//	  List all files in the data directory.
+//	  Response (200):
+//	    ["docs/hello.txt", "docs/world.txt"]
 func (leader *Leader) HandleClient(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
@@ -188,12 +193,47 @@ func (leader *Leader) HandleClient(w http.ResponseWriter, r *http.Request) {
 		leader.handleStatus(w, r)
 	case r.Method == http.MethodGet && r.URL.Path == "/file":
 		leader.handleFileRead(w, r)
-	case r.Method == http.MethodPost && r.URL.Path == "/client":
+	case r.Method == http.MethodGet && r.URL.Path == "/files":
+		leader.handleFileList(w, r)
+	case r.Method == http.MethodPost && r.URL.Path == "/api":
 		leader.handleSubmit(w, r)
 	default:
 		w.WriteHeader(404)
 		json.NewEncoder(w).Encode("Not found.")
 	}
+}
+
+func (leader *Leader) handleFileList(w http.ResponseWriter, r *http.Request) {
+	var files []string
+
+	err := filepath.Walk("data", func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+		if !info.IsDir() {
+			// Strip the "data/" prefix so paths are relative
+			relative, err := filepath.Rel("data", path)
+			if err != nil {
+				return err
+			}
+			files = append(files, relative)
+		}
+		return nil
+	})
+
+	if err != nil {
+		w.WriteHeader(500)
+		json.NewEncoder(w).Encode("Error listing files.")
+		return
+	}
+
+	// Return an empty array instead of null if no files exist
+	if files == nil {
+		files = []string{}
+	}
+
+	w.WriteHeader(200)
+	json.NewEncoder(w).Encode(files)
 }
 
 func (leader *Leader) handleFileRead(w http.ResponseWriter, r *http.Request) {

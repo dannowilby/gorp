@@ -63,6 +63,22 @@ func (broker *Broker) StopRPCServer() {
 	broker.rpc_server.Shutdown(context.Background())
 }
 
+func corsMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Access-Control-Allow-Origin", "*")
+		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
+		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
+
+		// Handle preflight requests
+		if r.Method == "OPTIONS" {
+			w.WriteHeader(http.StatusOK)
+			return
+		}
+
+		next.ServeHTTP(w, r)
+	})
+}
+
 func (broker *Broker) StartClientServer() {
 	rpc_port, err := strconv.Atoi(strings.Split(broker.Role.GetState().Host, ":")[1])
 	if err != nil {
@@ -93,7 +109,7 @@ func (broker *Broker) StartClientServer() {
 
 	broker.client_server = &http.Server{
 		Addr:    fmt.Sprintf(":%d", port),
-		Handler: mux,
+		Handler: corsMiddleware(mux),
 	}
 
 	go broker.client_server.ListenAndServe()

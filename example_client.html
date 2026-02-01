@@ -1,0 +1,679 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Raft File Store</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            background: #1a1a2e;
+            color: #e0e0e0;
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+        }
+
+        h1 {
+            text-align: center;
+            padding: 20px 0 40px;
+            font-size: 1.8rem;
+            color: #e94560;
+            letter-spacing: 1px;
+        }
+
+        .panel {
+            background: #16213e;
+            border-radius: 10px;
+            padding: 24px;
+            margin-bottom: 24px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+        }
+
+        .panel h2 {
+            font-size: 1.1rem;
+            color: #e94560;
+            margin-bottom: 16px;
+            padding-bottom: 8px;
+            border-bottom: 1px solid #0f3460;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        /* Form Styles */
+        .form-row {
+            display: flex;
+            gap: 12px;
+            margin-bottom: 12px;
+        }
+
+        .form-row input,
+        .form-row select {
+            flex: 1;
+            padding: 10px 14px;
+            border: 1px solid #0f3460;
+            border-radius: 6px;
+            background: #1a1a2e;
+            color: #e0e0e0;
+            font-size: 0.9rem;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+
+        .form-row input:focus,
+        .form-row select:focus {
+            border-color: #e94560;
+        }
+
+        .form-row select {
+            cursor: pointer;
+        }
+
+        .form-row select option {
+            background: #1a1a2e;
+        }
+
+        textarea {
+            width: 100%;
+            padding: 10px 14px;
+            border: 1px solid #0f3460;
+            border-radius: 6px;
+            background: #1a1a2e;
+            color: #e0e0e0;
+            font-size: 0.9rem;
+            font-family: 'Consolas', monospace;
+            resize: vertical;
+            min-height: 100px;
+            outline: none;
+            transition: border-color 0.2s;
+            margin-bottom: 12px;
+        }
+
+        textarea:focus {
+            border-color: #e94560;
+        }
+
+        button {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 6px;
+            background: #e94560;
+            color: #fff;
+            font-size: 0.9rem;
+            cursor: pointer;
+            transition: background 0.2s, transform 0.1s;
+        }
+
+        button:hover {
+            background: #c73652;
+        }
+
+        button:active {
+            transform: scale(0.97);
+        }
+
+        button:disabled {
+            background: #0f3460;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        /* File List */
+        .file-list {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .file-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 10px 14px;
+            background: #1a1a2e;
+            border-radius: 6px;
+            border: 1px solid #0f3460;
+            transition: border-color 0.2s;
+        }
+
+        .file-item:hover {
+            border-color: #e94560;
+        }
+
+        .file-item .file-name {
+            font-family: 'Consolas', monospace;
+            font-size: 0.9rem;
+            color: #a8d8ea;
+        }
+
+        .file-item .file-actions {
+            display: flex;
+            gap: 8px;
+        }
+
+        .file-actions button {
+            padding: 6px 12px;
+            font-size: 0.8rem;
+        }
+
+        .btn-view {
+            background: #0f3460;
+        }
+
+        .btn-view:hover {
+            background: #1a4a7a;
+        }
+
+        .btn-edit {
+            background: #e67e22;
+        }
+
+        .btn-edit:hover {
+            background: #d35400;
+        }
+
+        .btn-delete {
+            background: #c0392b;
+        }
+
+        .btn-delete:hover {
+            background: #a93226;
+        }
+
+        .empty-state {
+            color: #0f3460;
+            font-style: italic;
+            text-align: center;
+            padding: 20px 0;
+        }
+
+        /* Modal */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.6);
+            z-index: 100;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .modal-overlay.active {
+            display: flex;
+        }
+
+        .modal {
+            background: #16213e;
+            border-radius: 10px;
+            padding: 24px;
+            width: 90%;
+            max-width: 600px;
+            max-height: 80vh;
+            overflow-y: auto;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+        }
+
+        .modal h3 {
+            color: #e94560;
+            margin-bottom: 16px;
+            font-size: 1rem;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .modal .modal-content {
+            font-family: 'Consolas', monospace;
+            font-size: 0.85rem;
+            background: #1a1a2e;
+            border-radius: 6px;
+            padding: 14px;
+            white-space: pre-wrap;
+            word-break: break-all;
+            color: #a8d8ea;
+            min-height: 60px;
+        }
+
+        .modal .modal-actions {
+            display: flex;
+            justify-content: flex-end;
+            gap: 8px;
+            margin-top: 16px;
+        }
+
+        .btn-close {
+            background: #0f3460;
+        }
+
+        .btn-close:hover {
+            background: #1a4a7a;
+        }
+
+        /* Status Log */
+        .status-log {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+
+        .status-entry {
+            display: flex;
+            align-items: flex-start;
+            gap: 10px;
+            padding: 10px 14px;
+            border-radius: 6px;
+            font-size: 0.82rem;
+            background: #1a1a2e;
+            border-left: 3px solid #0f3460;
+        }
+
+        .status-entry.pending {
+            border-left-color: #f39c12;
+        }
+
+        .status-entry.success {
+            border-left-color: #27ae60;
+        }
+
+        .status-entry.failed {
+            border-left-color: #c0392b;
+        }
+
+        .status-entry .status-badge {
+            font-size: 0.7rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            padding: 2px 8px;
+            border-radius: 10px;
+            white-space: nowrap;
+        }
+
+        .status-badge.pending {
+            background: #f39c12;
+            color: #1a1a2e;
+        }
+
+        .status-badge.success {
+            background: #27ae60;
+            color: #fff;
+        }
+
+        .status-badge.failed {
+            background: #c0392b;
+            color: #fff;
+        }
+
+        .status-entry .status-details {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .status-entry .status-details .status-op {
+            color: #e0e0e0;
+            margin-bottom: 2px;
+        }
+
+        .status-entry .status-details .status-hash {
+            color: #0f3460;
+            font-family: 'Consolas', monospace;
+            font-size: 0.75rem;
+            word-break: break-all;
+        }
+
+        .status-log-empty {
+            color: #0f3460;
+            font-style: italic;
+            text-align: center;
+            padding: 12px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Raft File Store</h1>
+
+        <!-- Upload / Manage Panel -->
+        <div class="panel">
+            <h2>Upload File</h2>
+            <div class="form-row">
+                <input type="text" id="filePath" placeholder="e.g. docs/hello.txt">
+                <select id="operation">
+                    <option value="write">Write (Create/Overwrite)</option>
+                    <option value="update">Update (Existing Only)</option>
+                    <option value="delete">Delete</option>
+                </select>
+            </div>
+            <textarea id="fileContent" placeholder="File contents..."></textarea>
+            <button onclick="submitFile()">Submit</button>
+        </div>
+
+        <!-- File List Panel -->
+        <div class="panel">
+            <h2>Files <button style="float:right; padding: 4px 10px; font-size: 0.75rem;" onclick="refreshFiles()">Refresh</button></h2>
+            <div class="file-list" id="fileList">
+                <div class="empty-state">No files found.</div>
+            </div>
+        </div>
+
+        <!-- Status Log Panel -->
+        <div class="panel">
+            <h2>Operation Status</h2>
+            <div class="status-log" id="statusLog">
+                <div class="status-log-empty">No operations yet.</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- View Modal -->
+    <div class="modal-overlay" id="viewModal">
+        <div class="modal">
+            <h3 id="viewModalTitle">File Contents</h3>
+            <div class="modal-content" id="viewModalContent"></div>
+            <div class="modal-actions">
+                <button class="btn-close" onclick="closeModal('viewModal')">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Edit Modal -->
+    <div class="modal-overlay" id="editModal">
+        <div class="modal">
+            <h3>Edit File</h3>
+            <input type="text" id="editPath" style="width:100%; padding:10px 14px; border:1px solid #0f3460; border-radius:6px; background:#1a1a2e; color:#e0e0e0; font-size:0.9rem; margin-bottom:12px; outline:none;" disabled>
+            <textarea id="editContent" style="width:100%; min-height:120px;"></textarea>
+            <div class="modal-actions">
+                <button class="btn-close" onclick="closeModal('editModal')">Cancel</button>
+                <button onclick="saveEdit()">Save Update</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Polling interval for status checks in milliseconds
+        const POLL_INTERVAL = 500;
+
+        // Track active polls so we can stop them when resolved
+        const activePolls = new Map();
+
+        // ─── File Operations ────────────────────────────────────────────
+
+        async function submitFile() {
+            const path = document.getElementById('filePath').value.trim();
+            const operation = document.getElementById('operation').value;
+            const content = document.getElementById('fileContent').value;
+
+            if (!path) {
+                alert('Please enter a file path.');
+                return;
+            }
+
+            if (operation !== 'delete' && !content) {
+                alert('Please enter file contents.');
+                return;
+            }
+
+            const payload = {
+                type: 'data',
+                message: {
+                    path: path,
+                    blob: operation === 'delete' ? '' : content,
+                    operation: operation
+                }
+            };
+
+            try {
+                const res = await fetch('http://localhost:4234/api', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+
+                const data = await res.json();
+
+                if (res.ok) {
+                    addStatusEntry(data.hash, operation, path, 'pending');
+                    startPolling(data.hash, operation, path);
+
+                    // Clear form
+                    document.getElementById('filePath').value = '';
+                    document.getElementById('fileContent').value = '';
+                    document.getElementById('operation').value = 'write';
+                } else {
+                    alert('Submit failed: ' + JSON.stringify(data));
+                }
+            } catch (e) {
+                alert('Network error: ' + e.message);
+            }
+        }
+
+        async function deleteFile(path) {
+            const payload = {
+                type: 'data',
+                message: {
+                    path: path,
+                    blob: '',
+                    operation: 'delete'
+                }
+            };
+
+            try {
+                const res = await fetch('http://localhost:4234/api', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+
+                const data = await res.json();
+
+                if (res.ok) {
+                    addStatusEntry(data.hash, 'delete', path, 'pending');
+                    startPolling(data.hash, 'delete', path);
+                } else {
+                    alert('Delete failed: ' + JSON.stringify(data));
+                }
+            } catch (e) {
+                alert('Network error: ' + e.message);
+            }
+        }
+
+        // ─── Status Polling ─────────────────────────────────────────────
+
+        function startPolling(hash, operation, path) {
+            const intervalId = setInterval(async () => {
+                try {
+                    const res = await fetch(`http://localhost:4234/status?hash=${hash}`);
+                    const data = await res.json();
+
+                    if (data.status === 'success') {
+                        updateStatusEntry(hash, 'success');
+                        stopPolling(hash);
+                        refreshFiles();
+                    } else if (data.status === 'failed') {
+                        updateStatusEntry(hash, 'failed');
+                        stopPolling(hash);
+                    }
+                    // If pending, just keep polling
+                } catch (e) {
+                    console.error('Status poll failed for hash:', hash, e);
+                }
+            }, POLL_INTERVAL);
+
+            activePolls.set(hash, intervalId);
+        }
+
+        function stopPolling(hash) {
+            if (activePolls.has(hash)) {
+                clearInterval(activePolls.get(hash));
+                activePolls.delete(hash);
+            }
+        }
+
+        // ─── Status Log UI ──────────────────────────────────────────────
+
+        function addStatusEntry(hash, operation, path, status) {
+            const log = document.getElementById('statusLog');
+
+            // Remove the empty state message on first entry
+            const empty = log.querySelector('.status-log-empty');
+            if (empty) empty.remove();
+
+            const entry = document.createElement('div');
+            entry.className = `status-entry ${status}`;
+            entry.id = `status-${hash}`;
+            entry.innerHTML = `
+                <span class="status-badge ${status}">${status}</span>
+                <div class="status-details">
+                    <div class="status-op">${operation} &mdash; <em>${path}</em></div>
+                    <div class="status-hash">${hash}</div>
+                </div>
+            `;
+
+            // Prepend so newest is on top
+            log.insertBefore(entry, log.firstChild);
+        }
+
+        function updateStatusEntry(hash, newStatus) {
+            const entry = document.getElementById(`status-${hash}`);
+            if (!entry) return;
+
+            entry.className = `status-entry ${newStatus}`;
+            const badge = entry.querySelector('.status-badge');
+            badge.className = `status-badge ${newStatus}`;
+            badge.textContent = newStatus;
+        }
+
+        // ─── File List ──────────────────────────────────────────────────
+
+        async function refreshFiles() {
+            try {
+                const res = await fetch('http://localhost:4234/files');
+                const files = await res.json();
+                renderFileList(files);
+            } catch (e) {
+                console.error('Failed to fetch file list:', e);
+            }
+        }
+
+        function renderFileList(files) {
+            const list = document.getElementById('fileList');
+            list.innerHTML = '';
+
+            if (!files || files.length === 0) {
+                list.innerHTML = '<div class="empty-state">No files found.</div>';
+                return;
+            }
+
+            files.forEach(file => {
+                const item = document.createElement('div');
+                item.className = 'file-item';
+                item.innerHTML = `
+                    <span class="file-name">${file}</span>
+                    <div class="file-actions">
+                        <button class="btn-view" onclick="viewFile('${file}')">View</button>
+                        <button class="btn-edit" onclick="editFile('${file}')">Edit</button>
+                        <button class="btn-delete" onclick="deleteFile('${file}')">Delete</button>
+                    </div>
+                `;
+                list.appendChild(item);
+            });
+        }
+
+        // ─── Modals ─────────────────────────────────────────────────────
+
+        async function viewFile(path) {
+            try {
+                const res = await fetch(`http://localhost:4234/file?path=${encodeURIComponent(path)}`);
+                const content = await res.json();
+
+                document.getElementById('viewModalTitle').textContent = path;
+                document.getElementById('viewModalContent').textContent = content;
+                openModal('viewModal');
+            } catch (e) {
+                alert('Failed to fetch file: ' + e.message);
+            }
+        }
+
+        async function editFile(path) {
+            try {
+                const res = await fetch(`http://localhost:4234/file?path=${encodeURIComponent(path)}`);
+                const content = await res.json();
+
+                document.getElementById('editPath').value = path;
+                document.getElementById('editContent').value = content;
+                openModal('editModal');
+            } catch (e) {
+                alert('Failed to fetch file: ' + e.message);
+            }
+        }
+
+        async function saveEdit() {
+            const path = document.getElementById('editPath').value;
+            const content = document.getElementById('editContent').value;
+
+            const payload = {
+                type: 'data',
+                message: {
+                    path: path,
+                    blob: content,
+                    operation: 'update'
+                }
+            };
+
+            try {
+                const res = await fetch('http://localhost:4234/api', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+
+                const data = await res.json();
+
+                if (res.ok) {
+                    closeModal('editModal');
+                    addStatusEntry(data.hash, 'update', path, 'pending');
+                    startPolling(data.hash, 'update', path);
+                } else {
+                    alert('Update failed: ' + JSON.stringify(data));
+                }
+            } catch (e) {
+                alert('Network error: ' + e.message);
+            }
+        }
+
+        function openModal(id) {
+            document.getElementById(id).classList.add('active');
+        }
+
+        function closeModal(id) {
+            document.getElementById(id).classList.remove('active');
+        }
+
+        // Close modals on overlay click
+        document.querySelectorAll('.modal-overlay').forEach(overlay => {
+            overlay.addEventListener('click', (e) => {
+                if (e.target === overlay) {
+                    overlay.classList.remove('active');
+                }
+            });
+        });
+
+        // ─── Init ───────────────────────────────────────────────────────
+
+        refreshFiles();
+    </script>
+</body>
+</html>
