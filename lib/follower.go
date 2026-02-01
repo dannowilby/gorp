@@ -3,7 +3,6 @@ package gorp
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"log/slog"
 	"net/http"
 	"sync"
@@ -152,36 +151,4 @@ func (follower *Follower) GetChangeSignal() chan *RoleTransition {
 
 func (follower *Follower) GetState() *State {
 	return follower.State
-}
-
-func (follower *Follower) Apply() {
-	log := follower.State.Log
-	up_to := follower.State.CommitIndex
-	last_applied := follower.State.LastApplied
-
-	for last_applied != up_to {
-		entry := log[last_applied+1]
-
-		if entry.Type == "data" {
-			fmt.Println("applying:", last_applied+1)
-		}
-		if entry.Type == "config" {
-			fmt.Println("Updating config.")
-
-			var config ConfigData
-
-			// should not error due to previous error checking
-			err := json.Unmarshal(entry.Message, &config)
-
-			if err != nil {
-				fmt.Println(err)
-			}
-
-			// update the config
-			follower.State.Config = append(config.New, config.Old...)
-		}
-
-		last_applied++
-		follower.State.LastApplied = last_applied
-	}
 }

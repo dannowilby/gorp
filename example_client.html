@@ -438,6 +438,7 @@
             try {
                 const res = await fetch('http://localhost:4234/api', {
                     method: 'POST',
+                    redirect: 'follow',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(payload)
                 });
@@ -473,6 +474,7 @@
             try {
                 const res = await fetch('http://localhost:4234/api', {
                     method: 'POST',
+                    redirect: 'follow',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(payload)
                 });
@@ -495,7 +497,7 @@
         function startPolling(hash, operation, path) {
             const intervalId = setInterval(async () => {
                 try {
-                    const res = await fetch(`http://localhost:4234/status?hash=${hash}`);
+                    const res = await fetch(`http://localhost:4234/status?hash=${hash}`, { redirect: 'follow' });
                     const data = await res.json();
 
                     if (data.status === 'success') {
@@ -560,7 +562,7 @@
 
         async function refreshFiles() {
             try {
-                const res = await fetch('http://localhost:4234/files');
+                const res = await fetch('http://localhost:4234/files', { redirect: 'follow' });
                 const files = await res.json();
                 renderFileList(files);
             } catch (e) {
@@ -596,7 +598,7 @@
 
         async function viewFile(path) {
             try {
-                const res = await fetch(`http://localhost:4234/file?path=${encodeURIComponent(path)}`);
+                const res = await fetch(`http://localhost:4234/file?path=${encodeURIComponent(path)}`, { redirect: 'follow' });
                 const content = await res.json();
 
                 document.getElementById('viewModalTitle').textContent = path;
@@ -609,7 +611,7 @@
 
         async function editFile(path) {
             try {
-                const res = await fetch(`http://localhost:4234/file?path=${encodeURIComponent(path)}`);
+                const res = await fetch(`http://localhost:4234/file?path=${encodeURIComponent(path)}`, { redirect: 'follow' });
                 const content = await res.json();
 
                 document.getElementById('editPath').value = path;
@@ -636,6 +638,7 @@
             try {
                 const res = await fetch('http://localhost:4234/api', {
                     method: 'POST',
+                    redirect: 'follow',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(payload)
                 });
