@@ -1,14 +1,10 @@
 
-# gorp
+<div style="text-align: center;">
+  <h1>gorp</h1>
+</div>
 [![Go](https://github.com/dannowilby/gorp/actions/workflows/go.yml/badge.svg)](https://github.com/dannowilby/gorp/actions/workflows/go.yml)
 
-A distributed photo storage implemented with Raft [1].
-
-## Quick start
-To run a quick cluster with 3 instances, run the following command. Make sure
-your `config.local.json` is correct.
-
-`go run . -id=<i> -config=config.local.json`
+A distributed photo store implemented with Raft [1]. Read about the development [here]().
 
 ## Implemented features
 - [x] **Message appending** - follower replicas need to be able to add new
