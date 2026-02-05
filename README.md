@@ -1,10 +1,14 @@
 
-<div style="text-align: center;">
+<div style="width: 100%; text-align: center;">
   <h1>gorp</h1>
 </div>
+
 [![Go](https://github.com/dannowilby/gorp/actions/workflows/go.yml/badge.svg)](https://github.com/dannowilby/gorp/actions/workflows/go.yml)
 
 A distributed photo store implemented with Raft [1]. Read about the development [here]().
+
+## Getting started
+
 
 ## Implemented features
 - [x] **Message appending** - follower replicas need to be able to add new
@@ -22,11 +26,7 @@ A distributed photo store implemented with Raft [1]. Read about the development 
 - [ ] **Log compaction** - snapshots of the machine's log need to be stored on
   disk to save space and allow better recoverability/resiliency from crashes
 
-## Design considerations
-Embarrasingly a Kubernetes resource was designed at first. After more research,
-this was determined to be a ouroboros-like idea. Kubernetes uses etcd to ensure
-consistency between nodes/pods in a cluster. etcd is literally an implementation
-of Raft, so relying on it does not make the most amount of sense.
+## Disclaimer
 
 ## References
 
