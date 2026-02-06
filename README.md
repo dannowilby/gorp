@@ -1,8 +1,5 @@
 
-<div style="width: 100%; text-align: center;">
-  <h1>gorp</h1>
-</div>
-
+# gorp
 [![Go](https://github.com/dannowilby/gorp/actions/workflows/go.yml/badge.svg)](https://github.com/dannowilby/gorp/actions/workflows/go.yml)
 
 A distributed photo store implemented with Raft [1]. Read about the development [here]().
@@ -11,6 +8,8 @@ A distributed photo store implemented with Raft [1]. Read about the development 
 
 
 ## Implemented features
+
+### Raft
 - [x] **Message appending** - follower replicas need to be able to add new
   messages to the end of their log when the appropriate conditions are met
   (message term is valid, log is up-to-date, the previous message of both
@@ -23,8 +22,10 @@ A distributed photo store implemented with Raft [1]. Read about the development 
 - [x] **Config changes** - special messages can be passed that define updated
   network configurations. The new set of hosts in the configuration will be
   transitioned to while perserving the protocol invariants.
-- [ ] **Log compaction** - snapshots of the machine's log need to be stored on
-  disk to save space and allow better recoverability/resiliency from crashes
+
+### Photo store frontend
+- [x] **File uploads** - 
+- [x] **File downloads** - 
 
 ## Disclaimer
 
