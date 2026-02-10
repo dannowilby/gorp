@@ -5,6 +5,16 @@
 A distributed photo store implemented with Raft [1]. Read about the development [here]().
 
 ## Getting started
+1. Start your replicas, for example:
+   `go run . -config config.local.json`
+2. Serve the frontend directory:
+   `cd frontend && python3 -m http.server 5173`
+3. Open `http://localhost:5173`.
+4. Upload your cluster config JSON in the UI before sending operations.
+
+Frontend pages:
+- `frontend/index.html`: photo operations (upload/list/download/update/delete + raw operations).
+- `frontend/config.html`: upload a new config and broadcast `type: "config"` messages.
 
 
 ## Implemented features

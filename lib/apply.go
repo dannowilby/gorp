@@ -117,7 +117,8 @@ func (follower *Follower) Apply() {
 
 		if entry.Type == "data" {
 			fmt.Println("applying:", last_applied+1)
-			ApplyData(entry)
+			fmt.Println("Debug, not saving data but would if enabled")
+			// ApplyData(entry)
 		}
 		if entry.Type == "config" {
 			fmt.Println("Updating config.")
