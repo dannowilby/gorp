@@ -4,6 +4,8 @@
 
 A distributed photo store implemented with Raft [1]. Read about the development [here]().
 
+![gorp-ui preview](./preview.mp4)
+
 ## Getting started
 1. Start your replicas, for example:
    `go run . -config config.local.json`
