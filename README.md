@@ -4,7 +4,7 @@
 
 A distributed photo store implemented with Raft [1]. Read about the development [here]().
 
-[![gorp preview](https://img.youtube.com/vi/SxVlT8gQOqI/0.jpg)](https://www.youtube.com/watch?v=SxVlT8gQOqI)
+<video src="./preview.mp4" width="320" height="240" controls></video>
 
 ## Getting started
 1. Start your replicas, for example:
