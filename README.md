@@ -1,8 +1,9 @@
+<img width="895" height="642" alt="image" src="https://github.com/user-attachments/assets/386ef328-9182-4360-a9b3-251a20513744" />
 
 # gorp
 [![Go](https://github.com/dannowilby/gorp/actions/workflows/go.yml/badge.svg)](https://github.com/dannowilby/gorp/actions/workflows/go.yml)
 
-A distributed photo store implemented with Raft [1]. Read about the development [here]().
+A distributed photo store implemented with Raft [1]. Read about the development [here]() or watch a demo of it [here](https://www.youtube.com/watch?v=SxVlT8gQOqI).
 
 ## Getting started
 
