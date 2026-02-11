@@ -4,24 +4,19 @@
 
 A distributed photo store implemented with Raft [1]. Read about the development [here]().
 
-<video src="./preview.mp4" width="320" height="240" controls></video>
-
 ## Getting started
-1. Start your replicas, for example:
-   `go run . -config config.local.json`
-2. Serve the frontend directory:
-   `cd frontend && python3 -m http.server 5173`
-3. Open `http://localhost:5173`.
-4. Upload your cluster config JSON in the UI before sending operations.
 
-Frontend pages:
-- `frontend/index.html`: photo operations (upload/list/download/update/delete + raw operations).
-- `frontend/config.html`: upload a new config and broadcast `type: "config"` messages.
+### Starting a gorp instance
+Download or build the executable, and then run it. You can either set the
+`config` flag to point at a cluster configuration file, or you can manually send
+the file to the config endpoint. If using the config flag, make sure to set the
+`id` flag in conjunction to let the instance know which one it is.
 
+### Starting the frontend
+Change the `API_BASE` variable to point at one of the instances in your cluster.
+Then run the project normally.
 
 ## Implemented features
-
-### Raft
 - [x] **Message appending** - follower replicas need to be able to add new
   messages to the end of their log when the appropriate conditions are met
   (message term is valid, log is up-to-date, the previous message of both
@@ -34,12 +29,11 @@ Frontend pages:
 - [x] **Config changes** - special messages can be passed that define updated
   network configurations. The new set of hosts in the configuration will be
   transitioned to while perserving the protocol invariants.
-
-### Photo store frontend
-- [x] **File uploads** - 
-- [x] **File downloads** - 
-
-## Disclaimer
+- [x] **Status tracking** - Raft sacrificies availability over consistency and
+  partionability; this means that a message's status needs to be tracked by the
+  user for success, in this project's case using unique hashes
+- [x] **User file operations** - the frontend allows automatic tracking of upload, update,
+  and delete operations
 
 ## References
 
