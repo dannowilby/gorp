@@ -6,6 +6,7 @@
 A distributed photo store implemented with Raft [1]. Read about the development [here]() or watch a demo of it [here](https://www.youtube.com/watch?v=SxVlT8gQOqI).
 
 ## Getting started
+These docs are still a heavy work in progress, so any ambiguities or depreciations will be updated shortly.
 
 ### Starting a gorp instance
 Download or build the executable, and then run it. You can either set the
