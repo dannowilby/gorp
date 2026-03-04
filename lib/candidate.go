@@ -208,7 +208,7 @@ func (candidate *Candidate) Execute(ctx context.Context) {
 	// enforce its authority
 	if vote_tally > votes_threshold {
 		candidate.ChangeSignal <- &RoleTransition{RoleName: "leader", State: candidate.State}
-		slog.Debug("[candidate] votes surpassed threshold")
+		slog.Debug("[candidate] new leader elected", "elected_at", time.Now())
 		return
 	}
 

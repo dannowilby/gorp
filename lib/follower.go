@@ -137,6 +137,7 @@ func (follower *Follower) Execute(ctx context.Context) {
 
 			// multiple by 1000000 to convert ns to ms
 			if elapsed > time.Duration(follower.State.ElectionTimeout*1000000) {
+				slog.Debug("[follower] no heartbeat detected", "time_detected", time.Now().UTC())
 				// if heartbeat fails, send new state to change to a new candidate
 				follower.ChangeSignal <- &RoleTransition{RoleName: "candidate", State: follower.State}
 			}
