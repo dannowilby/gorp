@@ -93,6 +93,7 @@ func (state *State) Debug_Print() {
 	fmt.Println()
 
 	fmt.Println("INSTANCE STATE")
+	fmt.Printf("%s\n", state.Role)
 	fmt.Printf("%s:%d/%d\n\n", state.PeerAddress.Host, state.PeerAddress.RPCPort, state.PeerAddress.HTTPPort)
 
 	fmt.Printf("Term %d\nIndex %d\nLast Applied %d\n", state.CommitTerm, state.CommitIndex, state.LastApplied)

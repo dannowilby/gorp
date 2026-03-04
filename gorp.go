@@ -8,7 +8,6 @@ import (
 	"log/slog"
 	"os"
 	"os/signal"
-	"strings"
 	"syscall"
 
 	gorp "github.com/dannowilby/gorp/lib"
@@ -52,32 +51,6 @@ func Run(ctx context.Context, state *gorp.State) error {
 	}
 }
 
-func configure_log(logLevel *string) {
-
-	// Set up the logger with the specified level
-	var level slog.Level
-	switch strings.ToLower(*logLevel) {
-	case "debug":
-		level = slog.LevelDebug
-	case "info":
-		level = slog.LevelInfo
-	case "warn":
-		level = slog.LevelWarn
-	case "error":
-		level = slog.LevelError
-	default:
-		level = slog.LevelInfo
-	}
-
-	// Create a logger with the desired level
-	logger := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{
-		Level: level,
-	}))
-
-	// Set the logger as the default
-	slog.SetDefault(logger)
-}
-
 func load_config(path string) (*Config, error) {
 
 	f, err := os.Open(path)
@@ -103,7 +76,7 @@ func main() {
 
 	flag.Parse()
 
-	configure_log(logLevel)
+	gorp.ConfigureLog(logLevel)
 
 	if *id > -1 && *config == "" {
 		fmt.Println("Config must be set if id is not -1")
