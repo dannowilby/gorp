@@ -12,6 +12,7 @@ and created video demo of it
 [here](https://www.youtube.com/watch?v=SxVlT8gQOqI).
 
 ## Getting started
+These docs are still a heavy work in progress, so any ambiguities or depreciations will be updated shortly.
 
 ### Starting a gorp cluster
 `config.local.json` is an example configuration file. The configuration file can
