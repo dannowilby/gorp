@@ -31,7 +31,7 @@ func (candidate *Candidate) Init(state *State) *Candidate {
 
 func (candidate *Candidate) RequestVote(msg RequestVoteMessage, rply *RequestVoteReply) error {
 
-	slog.Debug("[candidate] request vote recieved", "vote_for", msg.CandidateId)
+	slog.Debug("[candidate] request vote received", "vote_for", msg.CandidateId)
 
 	if !CanVoteFor(candidate.State, &msg) || !VoteMsgIsUpToDate(candidate.State, &msg) {
 
@@ -58,7 +58,7 @@ func (candidate *Candidate) RequestVote(msg RequestVoteMessage, rply *RequestVot
 // Turn to follower if term is equal to or less than the message term
 func (candidate *Candidate) AppendMessage(message AppendMessage, reply *AppendMessageReply) error {
 
-	slog.Debug("[candidate] append message recieved")
+	slog.Debug("[candidate] append message received")
 
 	if !AppendMessageIsUpToDate(candidate.State, &message) {
 
