@@ -1,21 +1,25 @@
-<img width="895" height="642" alt="image" src="https://github.com/user-attachments/assets/386ef328-9182-4360-a9b3-251a20513744" />
+<img width="895" height="642" alt="image"
+src="https://github.com/user-attachments/assets/386ef328-9182-4360-a9b3-251a20513744"
+/>
 
 # gorp
 [![Go](https://github.com/dannowilby/gorp/actions/workflows/go.yml/badge.svg)](https://github.com/dannowilby/gorp/actions/workflows/go.yml)
 
-A distributed photo store implemented with Raft [1]. Read about the development [here]() or watch a demo of it [here](https://www.youtube.com/watch?v=SxVlT8gQOqI).
+A Raft implementation [1]. Before I pivoted/focused the direction of this
+project, I wrote about the why, what, and how
+[here](https://medium.com/@dywilby/building-something-for-someone-you-love-b850111fb27a)
+and created video demo of it
+[here](https://www.youtube.com/watch?v=SxVlT8gQOqI).
 
 ## Getting started
 
-### Starting a gorp instance
-Download or build the executable, and then run it. You can either set the
-`config` flag to point at a cluster configuration file, or you can manually send
-the file to the config endpoint. If using the config flag, make sure to set the
-`id` flag in conjunction to let the instance know which one it is.
+### Starting a gorp cluster
+`config.local.json` is an example configuration file. The configuration file can
+be supplied to an instance on its startup by setting the `-config` flag. Specify
+all the members of the cluster in the configuration file.
 
-### Starting the frontend
-Change the `API_BASE` variable to point at one of the instances in your cluster.
-Then run the project normally.
+Another way to start a cluster is to individually execute the binary, and then
+send a configuration change request with your desired cluster members.
 
 ## Implemented features
 - [x] **Message appending** - follower replicas need to be able to add new
@@ -33,9 +37,20 @@ Then run the project normally.
 - [x] **Status tracking** - Raft sacrificies availability over consistency and
   partionability; this means that a message's status needs to be tracked by the
   user for success, in this project's case using unique hashes
-- [x] **User file operations** - the frontend allows automatic tracking of upload, update,
-  and delete operations
+
+## The future of this project
+The project is being pivoted! The photo store and raft protocol implementation
+is being decoupled. This repo will just be the protocol, and more effort is
+being put into the following areas:
+1. Logging - adding debug information for appending messages, elections, etc...
+2. Snapshotting - compressing and clearing the in-memory log
+3. Comparisons to existing implementations - time to detect and recover a
+   crashed leader (comparing to the raft paper), queries per second (comparing
+   to etcd), etc...
+4. Full-system testing - running clusters under particular conditions and
+   automatically verifying correct behavior
 
 ## References
 
-[1] [In Search of an Understandable Consensus Algorithm (Extended Version)](https://raft.github.io/raft.pdf), Diego Ongaro and John Ousterhout
+[1] [In Search of an Understandable Consensus Algorithm (Extended
+Version)](https://raft.github.io/raft.pdf), Diego Ongaro and John Ousterhout

@@ -10,7 +10,7 @@ import (
 	"os/signal"
 	"syscall"
 
-	gorp "github.com/dannowilby/gorp/lib"
+	gorp "github.com/dannowilby/gorp/internal"
 )
 
 type Config struct {
