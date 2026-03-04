@@ -87,6 +87,21 @@ type State struct {
 	RandomizedTimeout []int `json:"randomizedTimeout"`
 }
 
+func (state *State) Debug_Print() {
+	fmt.Println()
+	fmt.Println("=======================================")
+	fmt.Println()
+
+	fmt.Println("INSTANCE STATE")
+	fmt.Printf("%s:%d/%d\n\n", state.PeerAddress.Host, state.PeerAddress.RPCPort, state.PeerAddress.HTTPPort)
+
+	fmt.Printf("Term %d\nIndex %d\nLast Applied %d\n", state.CommitTerm, state.CommitIndex, state.LastApplied)
+	fmt.Printf("\nLog length: %d\n\n", len(state.Log))
+
+	fmt.Println("=======================================")
+	fmt.Println()
+}
+
 // RoleTransition represents a request to transition to a new role
 type RoleTransition struct {
 	RoleName string // "leader", "candidate", "follower", or "" for shutdown
