@@ -24,7 +24,7 @@ func (follower *Follower) Init(state *State) *Follower {
 
 	follower.State = state
 	follower.State.Role = "follower"
-	follower.State.VotedFor = ""
+	follower.State.VotedFor = PeerAddress{}
 
 	// it's crucial that these channels are buffered so we don't wait for a
 	// receiver to be ready, causing a deadlock
@@ -75,7 +75,7 @@ func (follower *Follower) AppendMessage(message AppendMessage, reply *AppendMess
 
 func (follower *Follower) RequestVote(msg RequestVoteMessage, rply *RequestVoteReply) error {
 
-	slog.Debug("Request received on follower!")
+	slog.Debug("[follower] request vote received")
 
 	if !CanVoteFor(follower.State, &msg) || !VoteMsgIsUpToDate(follower.State, &msg) {
 		rply.Term = follower.State.CommitTerm
@@ -99,14 +99,16 @@ func (follower *Follower) RequestVote(msg RequestVoteMessage, rply *RequestVoteR
 }
 
 func (follower *Follower) HandleClient(w http.ResponseWriter, r *http.Request) {
-	leaderClientHost := HostToClientHost(follower.State.Leader)
-	if leaderClientHost == "" {
+	emptyAddress := PeerAddress{}
+	if follower.State.Leader == emptyAddress {
+		slog.Debug("[follower] no leader for http request")
 		w.WriteHeader(http.StatusServiceUnavailable)
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(map[string]string{"error": "leader not known"})
 		return
 	}
-	http.Redirect(w, r, leaderClientHost+r.RequestURI, http.StatusTemporaryRedirect)
+	slog.Debug("[follower] redirecting to leader for http request", "redirect_location", follower.State.Leader.HTTPAddr()+r.RequestURI)
+	http.Redirect(w, r, follower.State.Leader.HTTPAddr()+r.RequestURI, http.StatusTemporaryRedirect)
 }
 
 // Checks on the heartbeat and turns into a candidate if no pulse
@@ -139,7 +141,7 @@ func (follower *Follower) Execute(ctx context.Context) {
 				follower.ChangeSignal <- &RoleTransition{RoleName: "candidate", State: follower.State}
 			}
 
-			slog.Debug("Follower clock tick", "elapsed", elapsed)
+			slog.Debug("[follower] clock tick", "elapsed", elapsed)
 		}
 	}
 

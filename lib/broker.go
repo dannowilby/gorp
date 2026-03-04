@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"net/http"
 	"net/rpc"
-	"strconv"
 	"strings"
 
 	"github.com/gorilla/mux"
@@ -51,7 +50,7 @@ func (broker *Broker) StartRPCServer() {
 	router.Handle("/", server)
 
 	broker.rpc_server = &http.Server{
-		Addr:    broker.Role.GetState().Host,
+		Addr:    broker.Role.GetState().PeerAddress.RPCAddr(),
 		Handler: router,
 	}
 
@@ -80,12 +79,6 @@ func corsMiddleware(next http.Handler) http.Handler {
 }
 
 func (broker *Broker) StartClientServer() {
-	rpc_port, err := strconv.Atoi(strings.Split(broker.Role.GetState().Host, ":")[1])
-	if err != nil {
-		fmt.Println(err)
-		return
-	}
-	port := rpc_port + 3000
 
 	mux := http.NewServeMux()
 
@@ -108,7 +101,7 @@ func (broker *Broker) StartClientServer() {
 	})
 
 	broker.client_server = &http.Server{
-		Addr:    fmt.Sprintf(":%d", port),
+		Addr:    fmt.Sprintf(":%d", broker.Role.GetState().PeerAddress.HTTPPort),
 		Handler: corsMiddleware(mux),
 	}
 

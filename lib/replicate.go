@@ -37,7 +37,7 @@ func (leader *Leader) updateMachine(host string, success chan bool) {
 
 		append_message_args := AppendMessage{
 			Term:     leader.State.CommitTerm,
-			LeaderId: leader.State.Host,
+			LeaderId: leader.State.PeerAddress,
 
 			PrevLogTerm:  prev_term,
 			PrevLogIndex: prev_index,
@@ -81,12 +81,12 @@ func (leader *Leader) Replicate(parent_ctx context.Context, msg LogEntry) {
 	// query machines
 	accepted := make(chan bool)
 	for _, host := range leader.State.Config {
-		if host == leader.State.Host {
+		if host.RPCAddr() == leader.State.PeerAddress.RPCAddr() {
 			continue
 		}
 
 		// send message to machines, get response through accepted channel
-		go leader.updateMachine(host, accepted)
+		go leader.updateMachine(host.RPCAddr(), accepted)
 	}
 
 	majority := NumMajority(leader.State)

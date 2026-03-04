@@ -2,7 +2,7 @@ package gorp
 
 type RequestVoteMessage struct {
 	Term        int
-	CandidateId string
+	CandidateId PeerAddress
 
 	LastLogIndex int
 	LastLogTerm  int
@@ -36,5 +36,5 @@ func VoteMsgIsUpToDate(state *State, msg *RequestVoteMessage) bool {
 }
 
 func CanVoteFor(state *State, msg *RequestVoteMessage) bool {
-	return !(state.VotedFor != "" && state.VotedFor != msg.CandidateId)
+	return !(state.VotedFor != PeerAddress{} && state.VotedFor != msg.CandidateId)
 }

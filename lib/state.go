@@ -2,8 +2,7 @@ package gorp
 
 import (
 	"encoding/json"
-	"strconv"
-	"strings"
+	"fmt"
 	"time"
 )
 
@@ -39,28 +38,42 @@ type StatusResponse struct {
 	Hash   string `json:"hash"`
 }
 
+type PeerAddress struct {
+	Host     string `json:"host"`
+	RPCPort  int    `json:"rpcport"`
+	HTTPPort int    `json:"httpport"`
+}
+
+func (p PeerAddress) RPCAddr() string {
+	return fmt.Sprintf("%s:%d", p.Host, p.RPCPort)
+}
+
+func (p PeerAddress) HTTPAddr() string {
+	return fmt.Sprintf("http://%s:%d", p.Host, p.HTTPPort)
+}
+
 type ConfigData struct {
-	Old []string `json:"old"`
-	New []string `json:"new"`
+	Old []PeerAddress `json:"old"`
+	New []PeerAddress `json:"new"`
 }
 
 type State struct {
 	// used to redirect clients to the appropriate leader
-	Leader string `json:"leader"`
+	Leader PeerAddress `json:"leader"`
 
 	// the running replica's host/port
-	Host string `json:"host"`
+	PeerAddress PeerAddress `json:"address"`
 
 	// mostly used for debugging and testing, stores a string representation of the current role
 	Role string `json:"role"`
 
 	// the set of servers participating in consensus
-	Config []string `json:"config"`
+	Config []PeerAddress `json:"config"`
 
 	// persistent state
-	Log        []LogEntry `json:"log"`
-	CommitTerm int        `json:"commitTerm"`
-	VotedFor   string     `json:"votedFor"`
+	Log        []LogEntry  `json:"log"`
+	CommitTerm int         `json:"commitTerm"`
+	VotedFor   PeerAddress `json:"votedFor"`
 
 	// volatile state
 	CommitIndex int `json:"commitIndex"`
@@ -81,12 +94,19 @@ type RoleTransition struct {
 }
 
 func EmptyState() State {
+
+	peerAddr := PeerAddress{
+		Host:     "",
+		RPCPort:  1234,
+		HTTPPort: 4234,
+	}
+
 	return State{
-		Host:              "localhost:1234",
+		PeerAddress:       peerAddr,
 		Role:              "follower",
 		ElectionTimeout:   500,
 		RandomizedTimeout: []int{150, 300},
-		Config:            []string{"localhost:1234"},
+		Config:            []PeerAddress{peerAddr},
 		CommitTerm:        -1,
 		CommitIndex:       -1,
 		LastApplied:       -1,
@@ -97,13 +117,4 @@ func EmptyState() State {
 // machine from the majority. AKA the number of separate machines needed for a majority.
 func NumMajority(state *State) int {
 	return ((len(state.Config) + 1) / 2) - 1
-}
-
-func HostToClientHost(host string) string {
-	segments := strings.Split(host, ":")
-	port, err := strconv.Atoi(segments[1])
-	if err != nil {
-		return ""
-	}
-	return "http://" + segments[0] + ":" + strconv.Itoa(port+3000)
 }

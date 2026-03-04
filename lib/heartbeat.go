@@ -17,7 +17,7 @@ func (leader *Leader) sendHeartbeat(host string) {
 
 	append_message_args := AppendMessage{
 		Term:         leader.State.CommitTerm,
-		LeaderId:     leader.State.Host,
+		LeaderId:     leader.State.PeerAddress,
 		PrevLogIndex: -1,
 		PrevLogTerm:  -1,
 		LeaderCommit: leader.State.CommitIndex,
@@ -35,14 +35,14 @@ func (leader *Leader) SendHeartbeats(ctx context.Context) {
 		case <-time.After(250 * time.Millisecond):
 			for _, element := range leader.State.Config {
 
-				if element == leader.State.Host {
+				if element.RPCAddr() == leader.State.PeerAddress.RPCAddr() {
 					continue
 				}
 
 				// send heartbeat, we don't really care about what the response is right
 				// now, but in the future it will be used to inductively get the
 				// followers up to date
-				leader.sendHeartbeat(element)
+				leader.sendHeartbeat(element.RPCAddr())
 			}
 		case <-ctx.Done():
 			return

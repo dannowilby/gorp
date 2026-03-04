@@ -19,30 +19,30 @@ type Candidate struct {
 
 func (candidate *Candidate) Init(state *State) *Candidate {
 
-	slog.Debug("creating new candidate state")
+	slog.Debug("[candidate] creating new candidate state")
 
 	candidate.State = state
 	candidate.State.Role = "candidate"
 	candidate.ChangeSignal = make(chan *RoleTransition, 1)
-	candidate.State.VotedFor = ""
+	candidate.State.VotedFor = PeerAddress{}
 
 	return candidate
 }
 
 func (candidate *Candidate) RequestVote(msg RequestVoteMessage, rply *RequestVoteReply) error {
 
-	slog.Debug("request vote recieved", "vote_for", msg.CandidateId)
+	slog.Debug("[candidate] request vote recieved", "vote_for", msg.CandidateId)
 
 	if !CanVoteFor(candidate.State, &msg) || !VoteMsgIsUpToDate(candidate.State, &msg) {
 
-		slog.Debug("request vote not new enough", "vote_for", msg.CandidateId, "can_vote_for", CanVoteFor(candidate.State, &msg), "vote_msg_uptodate", VoteMsgIsUpToDate(candidate.State, &msg))
+		slog.Debug("[candidate] request vote not new enough", "vote_for", msg.CandidateId, "can_vote_for", CanVoteFor(candidate.State, &msg), "vote_msg_uptodate", VoteMsgIsUpToDate(candidate.State, &msg))
 
 		rply.Term = candidate.State.CommitTerm
 		rply.VoteGranted = false
 		return nil
 	}
 
-	slog.Debug("request vote granteded", "vote_for", msg.CandidateId)
+	slog.Debug("[candidate] request vote granteded", "vote_for", msg.CandidateId)
 
 	candidate.State.VotedFor = msg.CandidateId
 
@@ -58,18 +58,18 @@ func (candidate *Candidate) RequestVote(msg RequestVoteMessage, rply *RequestVot
 // Turn to follower if term is equal to or less than the message term
 func (candidate *Candidate) AppendMessage(message AppendMessage, reply *AppendMessageReply) error {
 
-	slog.Debug("append message recieved")
+	slog.Debug("[candidate] append message recieved")
 
 	if !AppendMessageIsUpToDate(candidate.State, &message) {
 
-		slog.Debug("append message not new enough", "up_to_date", AppendMessageIsUpToDate(candidate.State, &message))
+		slog.Debug("[candidate] append message not new enough", "up_to_date", AppendMessageIsUpToDate(candidate.State, &message))
 
 		reply.CommitTerm = candidate.State.CommitTerm
 		reply.Success = false
 		return nil
 	}
 
-	slog.Debug("message newer, converting to follower")
+	slog.Debug("[candidate] message newer, converting to follower")
 
 	// unlike the follower, we don't modify anything else
 	// this allows all the behavior that handles log synchronization by the
@@ -94,7 +94,7 @@ func (candidate *Candidate) SendRequest(ctx context.Context, vote_status chan bo
 
 	request_vote_args := RequestVoteMessage{
 		Term:        candidate.State.CommitTerm,
-		CandidateId: candidate.State.Host,
+		CandidateId: candidate.State.PeerAddress,
 
 		LastLogIndex: candidate.State.CommitIndex,
 		LastLogTerm:  candidate.State.CommitTerm,
@@ -117,7 +117,7 @@ func (candidate *Candidate) HandleClient(w http.ResponseWriter, r *http.Request)
 
 func (candidate *Candidate) Execute(ctx context.Context) {
 
-	slog.Debug("starting candidate execution")
+	slog.Debug("[candidate] starting candidate execution")
 
 	// Transitioning to this state, we immediately update the term
 	candidate.State.CommitTerm += 1
@@ -129,19 +129,20 @@ func (candidate *Candidate) Execute(ctx context.Context) {
 		// have yet to implement proper error handling
 		panic("please implement proper error handling please, config is probably bad")
 	}
-	slog.Debug("initial timeout starting", "duration", timeout_duration)
+	slog.Debug("[candidate] initial timeout starting", "duration", timeout_duration)
 	<-time.After(timeout_duration)
-	slog.Debug("finished initial timeout")
+	slog.Debug("[candidate] finished initial timeout")
 
 	// if already voted for another machine, don't try gathering votes
-	if candidate.State.VotedFor != "" {
-		slog.Debug("voted during initial timeout", "voted_for", candidate.State.VotedFor)
+	emptyAddress := PeerAddress{}
+	if candidate.State.VotedFor != emptyAddress {
+		slog.Debug("[candidate] voted during initial timeout", "voted_for", candidate.State.VotedFor)
 		return
 	}
 
 	// vote for self
-	candidate.State.VotedFor = candidate.State.Host
-	slog.Debug("voting for self")
+	candidate.State.VotedFor = candidate.State.PeerAddress
+	slog.Debug("[candidate] voting for self")
 
 	election_timeout_duration, t1_err := time.ParseDuration(strconv.Itoa(candidate.State.ElectionTimeout) + "ms")
 	if t1_err != nil {
@@ -152,7 +153,7 @@ func (candidate *Candidate) Execute(ctx context.Context) {
 	timeout_ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
-	slog.Debug("preparing to gather votes")
+	slog.Debug("[candidate] preparing to gather votes")
 
 	// vote counting mechanism
 	votes := make(chan bool)
@@ -164,14 +165,14 @@ func (candidate *Candidate) Execute(ctx context.Context) {
 	// call RequestVote to all other machines
 	for _, element := range candidate.State.Config {
 
-		if element == candidate.State.Host {
+		if element.RPCAddr() == candidate.State.PeerAddress.RPCAddr() {
 			continue
 		}
 
-		slog.Debug("gathering votes for self", "asking", element)
+		slog.Debug("[candidate] gathering votes for self", "asking", element)
 
 		// request vote from each machine in config
-		go candidate.SendRequest(timeout_ctx, votes, element)
+		go candidate.SendRequest(timeout_ctx, votes, element.RPCAddr())
 	}
 
 	// wait for votes to come in
@@ -179,12 +180,12 @@ func (candidate *Candidate) Execute(ctx context.Context) {
 	for !completed {
 		select {
 		case <-ctx.Done():
-			slog.Debug("execution cancelled")
+			slog.Debug("[candidate] execution cancelled")
 			// cancelled for some reason
 			cancel()
 			return
 		case <-time.After(election_timeout_duration):
-			slog.Debug("done collecting votes")
+			slog.Debug("[candidate] done collecting votes")
 			// oh no, we've timed out
 			completed = true
 
@@ -199,7 +200,7 @@ func (candidate *Candidate) Execute(ctx context.Context) {
 		}
 	}
 
-	slog.Debug("vote counts", "votes tally", vote_tally, "votes received", votes_received, "votes threshold", votes_threshold)
+	slog.Debug("[candidate] vote counts", "votes tally", vote_tally, "votes received", votes_received, "votes threshold", votes_threshold)
 
 	cancel()
 
@@ -207,11 +208,11 @@ func (candidate *Candidate) Execute(ctx context.Context) {
 	// enforce its authority
 	if vote_tally > votes_threshold {
 		candidate.ChangeSignal <- &RoleTransition{RoleName: "leader", State: candidate.State}
-		slog.Debug("votes surpassed threshold")
+		slog.Debug("[candidate] votes surpassed threshold")
 		return
 	}
 
-	slog.Debug("did not receive enough votes, resetting candidate")
+	slog.Debug("[candidate] did not receive enough votes, resetting candidate")
 
 	candidate.ChangeSignal <- &RoleTransition{RoleName: "candidate", State: candidate.State}
 }

@@ -36,11 +36,11 @@ func (leader *Leader) Init(state *State) *Leader {
 	leader.matchIndex = make(map[string]int)
 
 	for _, server := range state.Config {
-		leader.nextIndex[server] = len(leader.State.Log)
-		leader.matchIndex[server] = 0
+		leader.nextIndex[server.RPCAddr()] = len(leader.State.Log)
+		leader.matchIndex[server.RPCAddr()] = 0
 	}
 
-	fmt.Println("Leader:", leader.State.Host)
+	fmt.Println("Leader:", leader.State.PeerAddress.RPCAddr())
 
 	return leader
 }

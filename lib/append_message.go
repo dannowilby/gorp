@@ -2,7 +2,7 @@ package gorp
 
 type AppendMessage struct {
 	Term     int
-	LeaderId string
+	LeaderId PeerAddress
 
 	// -1 indicates that the log is empty
 	PrevLogIndex int
